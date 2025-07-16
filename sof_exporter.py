@@ -18,17 +18,6 @@ from gen_scoreboard import gen_scoreboard_init, generate_screenshot_for_port
 # When a 'server.cfg' is created, it triggers the generation of a screenshot,
 # using the corresponding player data and saving the output to a designated image folder.
 
-# --- [Original Drawing and Data Loading Functions - No Changes] ---
-
-# The color array for parsing in-string color codes.
-COLOR_ARRAY = [
-    "#ffffff", "#FFFFFF", "#FF0000", "#00FF00", "#ffff00", "#0000ff", "#ff00ff",
-    "#00ffff", "#000000", "#7f7f7f", "#ffffff", "#7f0000", "#007f00", "#ffffff",
-    "#7f7f00", "#00007f", "#564d28", "#4c5e36", "#376f65", "#005572", "#54647e",
-    "#54647e", "#66097b", "#705e61", "#980053", "#960018", "#702d07", "#54492a",
-    "#61a997", "#cb8f39", "#cf8316", "#ff8020"
-]
-
 def load_server_data(filepath):
     """Loads server data from a specified .cfg file."""
     server_data = {}
