@@ -2,6 +2,7 @@ import os
 import base64
 import math
 import sys
+import requests
 
 from PIL import Image
 from io import BytesIO
@@ -205,7 +206,7 @@ def generate_screenshot_for_port(port, sofplus_data_path, data):
     if "server" not in data:
         print("server_data not existing in data...")
         return
-        
+
     server_data = data["server"]
     print(f"\n--- Triggered screenshot generation for port {port} ---")
     

@@ -1,5 +1,4 @@
 import base64
-import requests
 
 import os
 import re
