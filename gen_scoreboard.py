@@ -48,7 +48,7 @@ def load_all_portraits(sof_dir):
     
     # NOTE: Your original code uses "portaits". 
     # If the correct path is "portraits", you must change it here.
-    base_path_in_pak = "ghoul/pmodels/portaits"
+    base_path_in_pak = "ghoul/pmodels/portraits"
 
     # Define which portraits are in which PAK directory.
     portrait_sources = {
