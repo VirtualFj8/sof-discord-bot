@@ -141,7 +141,7 @@ def draw_players(data, canvas_image, spritesheet):
     for i, player in enumerate(blue_players):
         y_base = 120 + (32 * i)
         try:
-            skin = all_portraits[p.get('skin', 'mullins')]
+            skin = all_portraits[player.get('skin', 'mullins')]
             canvas_image.paste(skin, (160, y_base), skin)
             draw_string_at(canvas_image, spritesheet, player['name'], 192, y_base)
             draw_string_at(canvas_image, spritesheet, "Score:  ", 192, y_base + 8, "#b5b2b5")
@@ -161,7 +161,7 @@ def draw_players(data, canvas_image, spritesheet):
     for i, player in enumerate(red_players):
         y_base = 120 + (32 * i)
         try:
-            skin = all_portraits[p.get('skin', 'mullins')]
+            skin = all_portraits[player.get('skin', 'mullins')]
             canvas_image.paste(skin, (340, y_base), skin)
             draw_string_at(canvas_image, spritesheet, player['name'], 372, y_base)
             draw_string_at(canvas_image, spritesheet, "Score:  ", 372, y_base + 8, "#b5b2b5")
