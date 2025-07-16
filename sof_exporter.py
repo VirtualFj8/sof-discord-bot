@@ -33,13 +33,13 @@ COLOR_ARRAY = [
 def load_server_data(filepath):
     """Loads server data from a specified .cfg file."""
     server_data = {}
-    # expanded_path = os.path.expanduser(filepath)
-    if not os.path.isfile(expanded_path):
-        print(f"Warning: Server config file not found: {expanded_path}")
+    
+    if not os.path.isfile(filepath):
+        print(f"Warning: Server config file not found: {filepath}")
         return server_data
     cvar_pattern = re.compile(r'set "([^"]+)" "([^"]*)"')
     try:
-        with open(expanded_path, 'r', encoding='latin-1') as f:
+        with open(filepath, 'r', encoding='latin-1') as f:
             for line in f:
                 match = cvar_pattern.match(line)
                 if match:
@@ -65,7 +65,7 @@ def load_server_data(filepath):
                         else:
                             server_data[clean_key] = value
     except Exception as e:
-        print(f"Error processing server config file {expanded_path}: {e}")
+        print(f"Error processing server config file {filepath}: {e}")
     return server_data
 
 def load_player_data_from_files(directory_path):
@@ -76,16 +76,16 @@ def load_player_data_from_files(directory_path):
     # Initialize a list of size 16 with None to represent slots 0-15.
     # This is created from scratch on each function call.
     players = [None] * 16
-    expanded_path = os.path.expanduser(directory_path)
+    
 
-    if not os.path.isdir(expanded_path):
-        print(f"Warning: Player data directory not found: {expanded_path}")
+    if not os.path.isdir(directory_path):
+        print(f"Warning: Player data directory not found: {directory_path}")
         return players
 
     cvar_pattern = re.compile(r'set "_sp_sv_info_client_([^"]+)" "([^"]*)"')
     file_pattern = re.compile(r'player_(\d+)\.cfg')
 
-    for filename in os.listdir(expanded_path):
+    for filename in os.listdir(directory_path):
         file_match = file_pattern.match(filename)
         if file_match:
             try:
@@ -94,7 +94,7 @@ def load_player_data_from_files(directory_path):
                 # Ensure the slot is within the valid range (0-15) before assigning.
                 if 0 <= slot < 16:
                     player_data = {}
-                    filepath = os.path.join(expanded_path, filename)
+                    filepath = os.path.join(directory_path, filename)
 
                     with open(filepath, 'r', encoding='latin-1') as f:
                         for line in f:
