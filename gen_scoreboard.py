@@ -6,6 +6,10 @@ import sys
 from PIL import Image
 from io import BytesIO
 
+#d3 sof libs
+from pak import unpack_one_to_memory
+import m32lib
+
 def gen_scoreboard_init(sof_dir):
     """
     Prepare some resource files from sof .pak by loading all portraits.

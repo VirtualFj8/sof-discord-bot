@@ -8,7 +8,6 @@ import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-from pak import unpack_one_to_memory
 
 # KaS discord signal
 from comm_discord import comm_discord
