@@ -10,7 +10,7 @@ from watchdog.events import FileSystemEventHandler
 
 
 # KaS discord signal
-from comm_discord import comm_discord
+#from comm_discord import comm_discord
 # d3 scoreboard image gen
 from gen_scoreboard import gen_scoreboard_init, generate_screenshot_for_port
 
@@ -195,7 +195,7 @@ class ServerCfgEventHandler(FileSystemEventHandler):
                     #d3 image gen.
                     generate_screenshot_for_port(port, sofplus_data_path, exported_data)
                     #kasey discord signal.
-                    comm_discord(port, sofplus_data_path, exported_data["players"])
+                    #comm_discord(port, sofplus_data_path, exported_data["players"])
             else:
                 print(f"Could not extract port from path: {src_path}")
 
