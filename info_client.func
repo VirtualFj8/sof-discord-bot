@@ -34,7 +34,25 @@ function info_client( )
   }
 }
 
-function info_server( )
+function info_server(~discord_mode, ~discord_slot)
 {
-  sp_sc_cvar_save info_server/server.cfg _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_*
+  sp_sc_cvar_save info_server/server.cfg _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot
+}
+
+function .wantplay(~slot, *)
+{
+  sp_sc_func_exec info_client
+  sp_sc_func_exec info_server ".wantplay" $~slot
+}
+
+function .match1(~slot, *)
+{
+  sp_sc_func_exec info_client
+  sp_sc_func_exec info_server ".match1" $~slot
+}
+
+function match2(~slot, *)
+{
+  sp_sc_func_exec info_client
+  sp_sc_func_exec info_server ".match2" $~slot
 }
