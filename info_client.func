@@ -1,0 +1,40 @@
+//****************************
+// Export client info to file
+//****************************
+
+function info_client_init( )
+{
+  //alias !info_client "sp_sc_func_load_file sofplus/addons/info_client.func"
+}
+
+function info_client( )
+{
+  set ~slot 0
+  sp_sc_flow_while number cvar ~slot < cvar maxclients
+  {
+    zero _sp_sv_info_client_ip
+    sp_sc_cvar_sset ~file info_client/player_$~slot .cfg
+
+    sp_sv_info_client #~slot
+    sp_sc_flow_if text cvar _sp_sv_info_client_ip != val ""
+    {
+      sp_sc_cvar_save #~file _sp_sv_info_client_*
+    }
+    else
+    {
+      // Delete file if it exist
+      sp_sc_file_find ~f sofplus/data/$~file filesystem file
+      sp_sc_flow_if number cvar ~f_0 == val 1
+      {
+        sp_sc_cvar_save #~file ""
+      }
+    }
+
+    add ~slot 1
+  }
+}
+
+function info_server( )
+{
+  sp_sc_cvar_save info_server/server.cfg _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_*
+}
