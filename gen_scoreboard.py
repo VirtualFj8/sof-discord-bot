@@ -139,42 +139,43 @@ def draw_players(data, canvas_image, spritesheet):
     blue_players.sort(key=lambda p: int(p.get('score', 0)), reverse=True)
     red_players.sort(key=lambda p: int(p.get('score', 0)), reverse=True)
     for i, player in enumerate(blue_players):
-        y_base = 120 + (32 * i)
-        try:
-            skin = all_portraits[player.get('skin', 'mullins')]
+        y_base = 120 + (32 * i)    
+
+        skin = all_portraits.get(player.get('skin', 'mullins'))
+        if skin is not None:
+            #acadie extension skins cause error for now
             canvas_image.paste(skin, (160, y_base), skin)
-            draw_string_at(canvas_image, spritesheet, player['name'], 192, y_base)
-            draw_string_at(canvas_image, spritesheet, "Score:  ", 192, y_base + 8, "#b5b2b5")
-            draw_string_at(canvas_image, spritesheet, str(player.get('score', 0)), 256, y_base + 8, "#ffffff")
-            draw_string_at(canvas_image, spritesheet, f"Ping:   {player.get('ping', 'N/A')}", 192, y_base + 16, "#b5b2b5")
-            
-            # Calculate and draw player time
-            frames_total = player.get('frames_total', 0)
-            time = math.floor(math.floor(int(frames_total)/10) / 60)
-            draw_string_at(canvas_image, spritesheet, f"Time:   {time}", 192, y_base + 24, "#b5b2b5")
-        except KeyError:
-            print("fatal error, can't find the portraits.")
-            sys.exit(1)
+
+        draw_string_at(canvas_image, spritesheet, player['name'], 192, y_base)
+        draw_string_at(canvas_image, spritesheet, "Score:  ", 192, y_base + 8, "#b5b2b5")
+        draw_string_at(canvas_image, spritesheet, str(player.get('score', 0)), 256, y_base + 8, "#ffffff")
+        draw_string_at(canvas_image, spritesheet, f"Ping:   {player.get('ping', 'N/A')}", 192, y_base + 16, "#b5b2b5")
+        
+        # Calculate and draw player time
+        frames_total = player.get('frames_total', 0)
+        time = math.floor(math.floor(int(frames_total)/10) / 60)
+        draw_string_at(canvas_image, spritesheet, f"Time:   {time}", 192, y_base + 24, "#b5b2b5")
+        
         
         
 
     for i, player in enumerate(red_players):
         y_base = 120 + (32 * i)
-        try:
-            skin = all_portraits[player.get('skin', 'mullins')]
-            canvas_image.paste(skin, (340, y_base), skin)
-            draw_string_at(canvas_image, spritesheet, player['name'], 372, y_base)
-            draw_string_at(canvas_image, spritesheet, "Score:  ", 372, y_base + 8, "#b5b2b5")
-            draw_string_at(canvas_image, spritesheet, str(player.get('score', 0)), 436, y_base + 8, "#ffffff")
-            draw_string_at(canvas_image, spritesheet, f"Ping:   {player.get('ping', 'N/A')}", 372, y_base + 16, "#b5b2b5")
+        skin = all_portraits.get(player.get('skin', 'mullins'))
+        if skin is not None:
+            #acadie extension skins cause error for now
+            canvas_image.paste(skin, (160, y_base), skin)
 
-            # Calculate and draw player time
-            frames_total = player.get('frames_total', 0)
-            time = math.floor(math.floor(int(frames_total)/10) / 60)
-            draw_string_at(canvas_image, spritesheet, f"Time:   {time}", 372, y_base + 24, "#b5b2b5")
-        except KeyError:
-            print("fatal error, can't find the portraits.")
-            sys.exit(1)
+        draw_string_at(canvas_image, spritesheet, player['name'], 372, y_base)
+        draw_string_at(canvas_image, spritesheet, "Score:  ", 372, y_base + 8, "#b5b2b5")
+        draw_string_at(canvas_image, spritesheet, str(player.get('score', 0)), 436, y_base + 8, "#ffffff")
+        draw_string_at(canvas_image, spritesheet, f"Ping:   {player.get('ping', 'N/A')}", 372, y_base + 16, "#b5b2b5")
+
+        # Calculate and draw player time
+        frames_total = player.get('frames_total', 0)
+        time = math.floor(math.floor(int(frames_total)/10) / 60)
+        draw_string_at(canvas_image, spritesheet, f"Time:   {time}", 372, y_base + 24, "#b5b2b5")
+        
 
     draw_string_at(canvas_image, spritesheet, "Score: ", 192, 68, "#b5b2b5")
     draw_string_at(canvas_image, spritesheet, str(blue_score), 248, 68, "#ffffff")
