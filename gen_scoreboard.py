@@ -202,6 +202,11 @@ def generate_screenshot_for_port(port, sofplus_data_path, data):
     Main logic to generate a screenshot for a specific server port.
     This function is triggered when a new server.cfg is detected.
     """
+    if "server" not in data:
+        print("server_data not existing in data...")
+        return
+        
+    server_data = data["server"]
     print(f"\n--- Triggered screenshot generation for port {port} ---")
     
     output_dir = os.path.join(sofplus_data_path, 'info_image')
