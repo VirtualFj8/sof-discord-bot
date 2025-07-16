@@ -120,9 +120,9 @@ def draw_players(data, canvas_image, spritesheet):
     """Processes and draws player data onto the screenshot."""
     blue_players, red_players = [], []
     blue_score, red_score = 0, 0
-    print(data)
     for player_data in list(data['players']):
-        print(player_data)
+        if player_data is None:
+            continue
         try:
             player_data['name'] = base64.b64decode(player_data['name']).decode('latin-1')
         except (base64.binascii.Error, UnicodeDecodeError) as e:

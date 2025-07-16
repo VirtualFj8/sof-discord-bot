@@ -109,7 +109,6 @@ def load_player_data_from_files(directory_path):
                                     player_data[key] = value
 
                     if 'name' in player_data:
-                        print("YES SET TEH PLAYERS NAME")
                         player_data['name'] = base64.b64encode(player_data['name'].encode('latin-1')).decode('ascii')
                     
                     if player_data:
