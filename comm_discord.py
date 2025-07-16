@@ -10,7 +10,7 @@ def comm_discord(player_data):
     
     MAIN_PATH = os.path.dirname(os.path.abspath(__file__))
     log_file = os.path.join(MAIN_PATH, "user-server", "sof.log")
-    webhook_url = "https://canary.discord.com/api/webhooks/1389994799255523459/eQfZ5L2LA2XMezOL92KjKnMTL-6FKB5pVv9ZYKVqpRuAGT3B4CbLgPGYEL80DYLkc5j6"
+    webhook_url = "your-url-here"
 
     def send_to_discord(message):
         payload = {"content": message}
