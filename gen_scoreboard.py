@@ -11,6 +11,9 @@ from io import BytesIO
 from pak import unpack_one_to_memory
 import m32lib
 
+# global resources.
+all_portraits = {}
+
 def gen_scoreboard_init(sof_dir):
     """
     Prepare some resource files from sof .pak by loading all portraits.
