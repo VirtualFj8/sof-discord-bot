@@ -100,7 +100,7 @@ def load_player_data_from_files(directory_path):
                             match = cvar_pattern.match(line)
                             if match:
                                 key, value = match.groups()
-                                if key in ['score', 'ping', 'team', 'deaths', 'frags', 'suicides', 'teamkills', 'spectator', 'flags_captured', 'flags_recovered', 'frames_total', 'skin', 'teamname']:
+                                if key in ['score', 'ping', 'team', 'deaths', 'frags', 'suicides', 'teamkills', 'spectator', 'flags_captured', 'flags_recovered', 'frames_total']:
                                     try:
                                         player_data[key] = int(value)
                                     except ValueError:
@@ -109,6 +109,7 @@ def load_player_data_from_files(directory_path):
                                     player_data[key] = value
 
                     if 'name' in player_data:
+                        print("YES SET TEH PLAYERS NAME")
                         player_data['name'] = base64.b64encode(player_data['name'].encode('latin-1')).decode('ascii')
                     
                     if player_data:
