@@ -26,7 +26,50 @@ def get_formatted_datetime():
 header = get_formatted_datetime()
 
 def send_to_discord(message):
-    payload = {"content": message}
+    #payload = {"content": message} TRUE ONE
+    
+    # DONE FOR TESTING
+    payload = {
+        "username": "My Image Bot",
+        "avatar_url": "https://example.com/bot_avatar.png",
+        "content": "Here's a cool image!",
+        "embeds": [
+            {
+                "title": "My Awesome Image",
+                "description": "This is a description for the image.",
+                "url": "https://example.com/some_link",
+                "color": 3447003,
+                "image": {
+                    "url": "https://i.imgur.com/your_image.jpg"
+                },
+                "thumbnail": {
+                    "url": "https://i.imgur.com/your_thumbnail.jpg"
+                },
+                "author": {
+                    "name": "My Name",
+                    "url": "https://example.com/author_link",
+                    "icon_url": "https://example.com/author_icon.png"
+                },
+                "fields": [
+                    {
+                        "name": "Field 1 Name",
+                        "value": "Field 1 Value",
+                        "inline": True
+                    },
+                    {
+                        "name": "Field 2 Name",
+                        "value": "Field 2 Value",
+                        "inline": False
+                    }
+                ],
+                "footer": {
+                    "text": "Sent via Webhook",
+                    "icon_url": "https://example.com/footer_icon.png"
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        ]
+    }
     response = requests.post(webhook_url, json=payload)
     if response.status_code not in [200, 204]:  
         print(f"Error sending message to Discord: {response.status_code}")
