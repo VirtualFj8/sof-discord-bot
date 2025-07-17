@@ -1,7 +1,7 @@
 
 import requests
 from fakedata import player_data_array
-from datetime import datetime
+from datetime import datetime, timezone
 
 webhook_url = "https://canary.discord.com/api/webhooks/1389994799255523459/eQfZ5L2LA2XMezOL92KjKnMTL-6FKB5pVv9ZYKVqpRuAGT3B4CbLgPGYEL80DYLkc5j6"
 
@@ -66,7 +66,7 @@ def send_to_discord(message):
                     "text": "Sent from SoF Server A",
                     "icon_url": "https://example.com/footer_icon.png"
                 },
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
         ]
     }
