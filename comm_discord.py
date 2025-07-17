@@ -30,40 +30,40 @@ def send_to_discord(message):
     
     # DONE FOR TESTING
     payload = {
-        "username": "My Image Bot",
-        "avatar_url": "https://example.com/bot_avatar.png",
-        "content": "Here's a cool image!",
+        "username": "🔴 [LIVE] SoF Gamers",
+        "avatar_url": "https://www.sof1.org/gallery/image/7656/medium",
+        "content": "\n\u200b\n 🕹️ **SCOREBOARD** 🕹️\n\u200b\n ",
         "embeds": [
             {
-                "title": "My Awesome Image",
-                "description": "This is a description for the image.",
-                "url": "https://example.com/some_link",
+                "title": "SoF Live Scoreboard",
+                "description": "Now in-game",
+                "url": "https://www.sof1.org/gallery/image/846/medium",
                 "color": 3447003,
                 "image": {
-                    "url": "https://i.imgur.com/your_image.jpg"
+                    "url": "https://www.sof1.org/gallery/image/846/medium"
                 },
                 "thumbnail": {
-                    "url": "https://i.imgur.com/your_thumbnail.jpg"
+                    "url": "https://www.sof1.org/gallery/image/846/medium"
                 },
                 "author": {
-                    "name": "My Name",
-                    "url": "https://example.com/author_link",
-                    "icon_url": "https://example.com/author_icon.png"
+                    "name": "Player One",
+                    "url": "https://www.sof1.org/",
+                    "icon_url": "https://www.sof1.org/gallery/image/7656/medium"
                 },
                 "fields": [
                     {
-                        "name": "Field 1 Name",
-                        "value": "Field 1 Value",
+                        "name": "Red team",
+                        "value": "Player One, Player Two",
                         "inline": True
                     },
                     {
-                        "name": "Field 2 Name",
-                        "value": "Field 2 Value",
+                        "name": "Blue team",
+                        "value": "Player Three, Player Four",
                         "inline": False
                     }
                 ],
                 "footer": {
-                    "text": "Sent via Webhook",
+                    "text": "Sent from SoF Server A",
                     "icon_url": "https://example.com/footer_icon.png"
                 },
                 "timestamp": datetime.utcnow().isoformat()
