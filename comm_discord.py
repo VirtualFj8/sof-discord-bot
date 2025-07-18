@@ -23,7 +23,27 @@ def get_date():
 
     return f"**{weekday}, {day_str} {month} {time_12h} ({time_24h})**"
 
-def generate_payload(caller_name, red_team, blue_team, custom_msg=None):
+def generate_payload(caller_name, red_team, blue_team, custom_msg=None, total_players=None):
+
+    fields = [
+        {
+            "name": "Red team",
+            "value": ", ".join(red_team) or "None",
+            "inline": True
+        },
+        {
+            "name": "Blue team",
+            "value": ", ".join(blue_team) or "None",
+            "inline": False
+        }
+    ] 
+    if total_players is not None:
+        fields.append({
+            "name": "Total players",
+            "value": str(total_players),
+            "inline": True
+        })
+        
     return {
         "username": "🔴 [LIVE] SoF Gamers",
         "avatar_url": "https://www.sof1.org/gallery/image/7656/medium",
@@ -45,18 +65,7 @@ def generate_payload(caller_name, red_team, blue_team, custom_msg=None):
                     "url": "https://www.sof1.org/",
                     "icon_url": "https://www.sof1.org/gallery/image/7656/medium"
                 },
-                "fields": [
-                    {
-                        "name": "Red team",
-                        "value": ", ".join(red_team) or "None",
-                        "inline": True
-                    },
-                    {
-                        "name": "Blue team",
-                        "value": ", ".join(blue_team) or "None",
-                        "inline": False
-                    }
-                ],
+                "fields": fields,
                 "footer": {
                     "text": "Sent from SoF Server A",
                     "icon_url": "https://example.com/footer_icon.png"
@@ -84,8 +93,9 @@ def comm_discord(mode, player_data, slot_caller):
     for player in player_data:
         print(f'player data is {player.name}')
 
-    ### Getting names
+    ### Getting players, teams, etc.
     # player_names = ", ".join([player.name for player in player_data]) <- NAMES: ALL TOGETHER
+    total_players = len(player_data)
     player_names = "\n- " + "\n- ".join([player.name for player in player_data]) # <- NAMES: 1 EACH LINE
     red_team = [player.name for player in player_data if player.team.lower() == "red"]
     blue_team = [player.name for player in player_data if player.team.lower() == "blue"]
@@ -110,7 +120,7 @@ def comm_discord(mode, player_data, slot_caller):
             f"{caller_name} is calling! Come if you're free and want to play!"
         )
     
-    payload = generate_payload(caller_name, red_team, blue_team, message)
+    payload = generate_payload(caller_name, red_team, blue_team, message, total_players)
     send_to_discord(payload)
     
 class Player:
@@ -129,12 +139,12 @@ class Player:
         self.frames_total = data.get("frames_total", 0)
 
 if __name__ == "__main__":
-    player_list = [Player(data) for data in player_data_array]
+    player_data = [Player(data) for data in player_data_array]
 
     slot_caller = 0
 
     mode = input("Type a cmd to test it (.wantplay, .match1, .match2): ").strip()
     if mode in [".wantplay", ".match1", ".match2"]:
-        comm_discord(mode, player_list, slot_caller)
+        comm_discord(mode, player_data, slot_caller)
     else:
         print("Unknown cmd.")
