@@ -65,9 +65,9 @@ def generate_payload(caller_name, red_team, blue_team, custom_msg=None, total_pl
                     "url": "https://www.sof1.org/",
                     "icon_url": "https://www.sof1.org/gallery/image/7656/medium"
                 },
-                "fields": fields,
+                "fields": fields, 
                 "footer": {
-                    "text": "Sent from SoF Server A",
+                    "text": "Sent from SoF Server A", # f"Sent from {server_name}"
                     "icon_url": "https://example.com/footer_icon.png"
                 },
                 "timestamp": datetime.now(timezone.utc).isoformat()
@@ -87,7 +87,7 @@ def send_to_discord(payload): #payload
 
 def comm_discord(mode, player_data, slot_caller):
 
-    header = get_date()
+    request_date = get_date()
 
     ### Debugging data ( - Not really needed for this purpose - )
     for player in player_data:
@@ -104,20 +104,24 @@ def comm_discord(mode, player_data, slot_caller):
     ### Getting modes
     if mode == ".wantplay":
         message = (
-            f"# Match Request for [_{header}_]\n"
+            f"# Match Request for [_{request_date}_]\n"
             f"```diff\n+ Players: ```"
             f"```diff{player_names} ```"
             f"```diff\n+ Competitive match is wanted by {caller_name}```"
         )
     elif mode == ".match1":
         message = (
-            f"Match is on the way! {player_names} need 1 player or an odd-sized group (3, 5, etc.). "
-            f"{caller_name} is calling! Come if you're free and want to play!"
+            f"# Match Request for [_{request_date}_]\n"
+            f"```diff\n+ Players: ```"
+            f"```diff{player_names} ```"
+            f"```diff\n+ Match is on the way! We need 1 player or an odd-sized group (3, 5, etc.). ```"
         )
     elif mode == ".match2":
         message = (
-            f"Match is on the way! {player_names} need 2 players or an even-sized group (4, 6, etc.). "
-            f"{caller_name} is calling! Come if you're free and want to play!"
+            f"# Match Request for [_{request_date}_]\n"
+            f"```diff\n+ Players: ```"
+            f"```diff{player_names} ```"
+            f"```diff\n+ Match is on the way! We need 2 players or an even-sized group (4, 6, etc.). ```"
         )
     
     payload = generate_payload(caller_name, red_team, blue_team, message, total_players)
@@ -131,7 +135,7 @@ class Player:
         self.team = data.get("team", "")
         self.deaths = data.get("deaths", 0)
         self.frags = data.get("frags", 0)
-        self.suicides = data.get("suicides", 0)
+        self.suicidekills = data.get("suicidekills", 0)
         self.teamkills = data.get("teamkills", 0)
         self.spectator = data.get("spectator", 0)
         self.flags_captured = data.get("flags_captured", 0)
