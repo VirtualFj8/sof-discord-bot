@@ -465,8 +465,8 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     draw_string_at(base_img, spritesheet, header1, overlay_x, overlay_base_y + 0, "#ffffff")
     draw_string_at(base_img, spritesheet, header2, overlay_x, overlay_base_y + 8, "#b5b2b5")
 
-    # Build a flat ordered list of players (blue then red)
-    ordered_players = blue_players + red_players
+    # Build a flat ordered list of players (blue then red), then reverse the order
+    ordered_players = list(reversed(blue_players + red_players))
     for row_index, (slot, p) in enumerate(ordered_players):
         # Safe getters
         ping = int(p.get("ping", 0) or 0)
