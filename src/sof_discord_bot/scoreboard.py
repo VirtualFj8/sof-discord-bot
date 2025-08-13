@@ -13,8 +13,11 @@ from .vendor import m32lib
 
 logger = get_logger(__name__)
 
-# Cache for portraits loaded from PAKs
+# Cache for portraits and other assets loaded from PAKs
 ALL_PORTRAITS: dict[str, Image.Image] = {}
+SPRITESHEET_CONCHARS: Optional[Image.Image] = None
+FLAG_IMG_RED: Optional[Image.Image] = None
+FLAG_IMG_BLUE: Optional[Image.Image] = None
 
 COLOR_ARRAY = [
     "#ffffff", "#FFFFFF", "#FF0000", "#00FF00", "#ffff00", "#0000ff", "#ff00ff",
@@ -26,9 +29,18 @@ COLOR_ARRAY = [
 
 
 def gen_scoreboard_init(sof_dir: str) -> dict[str, Image.Image]:
-    global ALL_PORTRAITS
+    global ALL_PORTRAITS, SPRITESHEET_CONCHARS, FLAG_IMG_RED, FLAG_IMG_BLUE
     ALL_PORTRAITS = load_all_portraits(sof_dir)
-    logger.info("Initialization complete: %d portraits loaded.", len(ALL_PORTRAITS))
+    # Load additional resources from PAKs
+    SPRITESHEET_CONCHARS = load_conchars_from_paks(sof_dir)
+    FLAG_IMG_RED, FLAG_IMG_BLUE = load_flags_from_paks(sof_dir)
+    logger.info(
+        "Initialization complete: %d portraits, conchars=%s, flags(red=%s, blue=%s)",
+        len(ALL_PORTRAITS),
+        bool(SPRITESHEET_CONCHARS),
+        bool(FLAG_IMG_RED),
+        bool(FLAG_IMG_BLUE),
+    )
     return ALL_PORTRAITS
 
 
@@ -64,6 +76,62 @@ def load_all_portraits(sof_dir: str) -> dict[str, Image.Image]:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to load portrait %s from %s: %s", filename, pak_dir, exc)
     return portrait_images
+
+
+def unpack_from_paks(sof_dir: str, relative_path: str) -> Optional[bytes]:
+    """Try to unpack a file from common PAK archives under <sof_dir>/base/.
+
+    Returns file bytes or None if not found.
+    """
+    for pak_name in ("pak0.pak", "pak1.pak", "pak2.pak"):
+        pak_archive = os.path.join(sof_dir, "base", pak_name)
+        try:
+            file_bytes = unpack_one_to_memory(pak_archive, relative_path)
+            if file_bytes:
+                return file_bytes
+        except Exception:
+            continue
+    return None
+
+
+def load_conchars_from_paks(sof_dir: str) -> Optional[Image.Image]:
+    """Load pics/console/conchars.png from game PAKs as a spritesheet image."""
+    rel = os.path.join("pics", "console", "conchars.png")
+    data = unpack_from_paks(sof_dir, rel)
+    if not data:
+        return None
+    try:
+        return Image.open(BytesIO(data)).convert("RGBA")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to load conchars from PAKs: %s", exc)
+        return None
+
+
+def load_flags_from_paks(sof_dir: str) -> tuple[Optional[Image.Image], Optional[Image.Image]]:
+    """Load red/blue flag HUD icons from M32 resources in PAKs."""
+    red_rel = os.path.join("pics", "interface2", "ctfr_hudflag.m32")
+    blue_rel = os.path.join("pics", "interface2", "ctfb_hudflag.m32")
+    red_img = None
+    blue_img = None
+    red_data = unpack_from_paks(sof_dir, red_rel)
+    blue_data = unpack_from_paks(sof_dir, blue_rel)
+    try:
+        if red_data:
+            mh = m32lib.MipHeader("ctfr_hudflag.m32", red_data)
+            w = int(mh.width.read()[0])
+            h = int(mh.height.read()[0])
+            red_img = Image.frombytes("RGBA", (w, h), mh.imgdata())
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to load red flag from PAKs: %s", exc)
+    try:
+        if blue_data:
+            mh = m32lib.MipHeader("ctfb_hudflag.m32", blue_data)
+            w = int(mh.width.read()[0])
+            h = int(mh.height.read()[0])
+            blue_img = Image.frombytes("RGBA", (w, h), mh.imgdata())
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to load blue flag from PAKs: %s", exc)
+    return red_img, blue_img
 
 
 def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: str, xpos: int, ypos: int, color_override: Optional[str] = None) -> None:
@@ -139,16 +207,22 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
 
 
 def draw_screenshot_hud(spritesheet: Image.Image, data: dict, canvas_image: Image.Image) -> None:
-    try:
-        asset_dir = os.path.join(os.path.dirname(__file__), "assets")
-        blueflag_img = Image.open(os.path.join(asset_dir, "blueflag.png")).convert("RGBA")
-        redflag_img = Image.open(os.path.join(asset_dir, "redflag.png")).convert("RGBA")
-    except FileNotFoundError as exc:
-        logger.error("Asset file not found: %s", exc)
-        return
+    # Prefer flags loaded from PAKs; no-op if not available
+    if FLAG_IMG_BLUE and FLAG_IMG_RED:
+        canvas_image.paste(FLAG_IMG_BLUE, (160, 55), FLAG_IMG_BLUE)
+        canvas_image.paste(FLAG_IMG_RED, (340, 55), FLAG_IMG_RED)
+    else:
+        # Fallback to asset images if provided
+        try:
+            asset_dir = os.path.join(os.path.dirname(__file__), "assets")
+            blueflag_img = Image.open(os.path.join(asset_dir, "blueflag.png")).convert("RGBA")
+            redflag_img = Image.open(os.path.join(asset_dir, "redflag.png")).convert("RGBA")
+            canvas_image.paste(blueflag_img, (160, 55), blueflag_img)
+            canvas_image.paste(redflag_img, (340, 55), redflag_img)
+        except FileNotFoundError:
+            # If neither PAK nor assets provide flags, continue without them
+            logger.info("Flag HUD images not available; continuing without them")
 
-    canvas_image.paste(blueflag_img, (160, 55), blueflag_img)
-    canvas_image.paste(redflag_img, (340, 55), redflag_img)
     server_info = data.get("server", {})
     blue_caps = server_info.get("num_flags_blue", 0)
     red_caps = server_info.get("num_flags_red", 0)
@@ -171,11 +245,14 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
     output_path = os.path.join(output_dir, "ss.png")
     os.makedirs(output_dir, exist_ok=True)
 
-    try:
-        spritesheet = Image.open(os.path.join(os.path.dirname(__file__), "assets", "conchars.png")).convert("RGBA")
-    except FileNotFoundError:
-        logger.error("Could not load 'conchars.png'. Ensure assets are installed.")
-        return None
+    # Use conchars from PAKs if available; fallback to bundled asset
+    spritesheet: Optional[Image.Image] = SPRITESHEET_CONCHARS
+    if spritesheet is None:
+        try:
+            spritesheet = Image.open(os.path.join(os.path.dirname(__file__), "assets", "conchars.png")).convert("RGBA")
+        except FileNotFoundError:
+            logger.error("Could not load 'conchars' spritesheet from PAKs or assets.")
+            return None
 
     map_full_name = server_data.get("map_current", "dm/dmjpnctf1").lower()
     map_substr = "".join(map_full_name.split("/"))
