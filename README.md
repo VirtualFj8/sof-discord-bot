@@ -42,9 +42,11 @@ You can either run from source with a virtual environment or install as a packag
 ### Option A: Run from source
 1. Clone this repository into the folder where `sof.exe` resides (so parent path points to SoF root):
    - Example tree: `./sof.exe`, `./base/`, `./user-28910/`, `./sof-discord-bot/`
-2. Create and activate a venv, then install dependencies:
-   - Linux/macOS: `./setup_env.sh`
+2. Create a venv and install dependencies:
+   - Linux/macOS (setup only): `./setup_env.sh`
+   - Linux/macOS (setup + activate current shell): `source setup_env.sh`
    - Windows: `setup_env.bat`
+   - Manual activation after setup (Linux/macOS): `source sof-discord-venv/bin/activate`
 3. Copy `info_client.func` to each server's addons folder:
    - `user-<PORT>/sofplus/addons/info_client.func`
    - For many servers, you may place it in `base/sofplus/addons/` instead
@@ -120,6 +122,46 @@ python -m sof_discord_bot.cli
   - `.wantplay`
   - `.match1`
   - `.match2`
+
+## Run as a systemd service (Linux)
+Below is a minimal service template. Adjust paths and user/group.
+
+1) Create a dedicated user (optional but recommended):
+```bash
+sudo useradd --system --create-home --shell /usr/sbin/nologin sofbot || true
+```
+
+2) Place the repo and create a venv as that user:
+```bash
+sudo mkdir -p /opt/sof-discord-bot
+sudo chown -R sofbot:sofbot /opt/sof-discord-bot
+sudo -u sofbot git clone <this-repo> /opt/sof-discord-bot
+cd /opt/sof-discord-bot
+sudo -u sofbot -H bash -lc 'cd /opt/sof-discord-bot && ./setup_env.sh'
+```
+
+3) Configure environment:
+```bash
+sudo cp systemd/sof-discord-bot.env.example /etc/default/sof-discord-bot
+sudo nano /etc/default/sof-discord-bot  # set DISCORD_WEBHOOK_URL, SOF_BOT_LOG
+```
+
+4) Install the service unit:
+```bash
+sudo cp systemd/sof-discord-bot.service /etc/systemd/system/sof-discord-bot.service
+sudo nano /etc/systemd/system/sof-discord-bot.service  # adjust WorkingDirectory and venv path if needed
+sudo systemctl daemon-reload
+sudo systemctl enable sof-discord-bot
+sudo systemctl start sof-discord-bot
+```
+
+5) Manage the service:
+```bash
+sudo systemctl status sof-discord-bot
+sudo systemctl restart sof-discord-bot
+sudo systemctl stop sof-discord-bot
+journalctl -u sof-discord-bot -f
+```
 
 ## License
 MIT for this repository. Game assets remain the property of their respective owners.

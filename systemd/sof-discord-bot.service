@@ -1,0 +1,34 @@
+# Template systemd unit. Copy to /etc/systemd/system/sof-discord-bot.service and edit paths/user.
+[Unit]
+Description=SoF Discord Bot (scoreboard watcher and Discord webhook)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Run as a dedicated unprivileged user/group
+User=sofbot
+Group=sofbot
+
+# Directory where the repository lives (adjust)
+WorkingDirectory=/opt/sof-discord-bot
+
+# Load environment (optional). Create this file with DISCORD_WEBHOOK_URL, SOF_BOT_LOG, etc.
+EnvironmentFile=-/etc/default/sof-discord-bot
+
+# Use the venv's Python directly (adjust venv path)
+ExecStart=/opt/sof-discord-bot/sof-discord-venv/bin/python -m sof_discord_bot.cli
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+
+# Improve file descriptors and limits if needed
+# LimitNOFILE=8192
+
+# Journald logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
