@@ -16,8 +16,12 @@ WorkingDirectory=/opt/sof-discord-bot
 # Load environment (optional). Create this file with DISCORD_WEBHOOK_URL, SOF_BOT_LOG, etc.
 EnvironmentFile=-/etc/default/sof-discord-bot
 
-# Use the venv's Python directly (adjust venv path)
-ExecStart=/opt/sof-discord-bot/sof-discord-venv/bin/python -m sof_discord_bot.cli
+# Preferred: use the venv's console script (requires `pip install -e .` in the venv)
+ExecStart=/opt/sof-discord-bot/sof-discord-venv/bin/sof-discord-bot
+
+# Alternative (uncomment if you don't install the package into the venv):
+# Environment=PYTHONPATH=/opt/sof-discord-bot/src
+# ExecStart=/opt/sof-discord-bot/sof-discord-venv/bin/python -m sof_discord_bot.cli
 
 # Restart policy
 Restart=on-failure
