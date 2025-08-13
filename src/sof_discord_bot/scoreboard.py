@@ -164,10 +164,10 @@ def draw_screenshot_hud(spritesheet: Image.Image, data: dict, canvas_image: Imag
     draw_players(data, canvas_image, spritesheet)
 
 
-def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) -> None:
+def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) -> str | None:
     if "server" not in data:
         logger.error("server_data is missing in data")
-        return
+        return None
 
     server_data = data["server"]
     logger.info("Triggered screenshot generation for port %s", port)
@@ -180,7 +180,7 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
         spritesheet = Image.open(os.path.join(os.path.dirname(__file__), "assets", "conchars.png")).convert("RGBA")
     except FileNotFoundError:
         logger.error("Could not load 'conchars.png'. Ensure assets are installed.")
-        return
+        return None
 
     map_full_name = server_data.get("map_current", "dm/dmjpnctf1").lower()
     map_substr = "".join(map_full_name.split("/"))
@@ -222,5 +222,7 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
         final_path = os.path.expanduser(output_path)
         canvas_image.save(final_path)
         logger.info("Successfully created screenshot: %s", final_path)
+        return final_path
     except Exception as exc:  # noqa: BLE001
         logger.exception("Error saving the final image: %s", exc)
+        return None

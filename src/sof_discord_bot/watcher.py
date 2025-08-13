@@ -8,7 +8,7 @@ from watchdog.events import FileSystemEventHandler
 
 from .scoreboard import gen_scoreboard_init, generate_screenshot_for_port
 from .exporter import read_data_from_sof_server
-from .discorder import generate_payload, send_to_discord
+from .discorder import generate_payload, send_to_discord, upload_image_to_discord
 from .logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -45,7 +45,7 @@ class ServerCfgEventHandler(FileSystemEventHandler):
             exported_data = read_data_from_sof_server(port, sofplus_data_path)
             if exported_data is None:
                 return
-            generate_screenshot_for_port(port, sofplus_data_path, exported_data)
+            image_path = generate_screenshot_for_port(port, sofplus_data_path, exported_data)
             # Build and send Discord notification (optional, requires DISCORD_WEBHOOK_URL)
             try:
                 server = exported_data.get("server", {})
@@ -100,7 +100,12 @@ class ServerCfgEventHandler(FileSystemEventHandler):
                     total_players=total_players,
                     image_url=None,
                 )
-                send_to_discord(payload)
+                mode = server.get("mode") or ""
+                if mode == ".upload_match" and image_path:
+                    # Upload as file to webhook so it lives in Discord
+                    upload_image_to_discord(image_path, payload)
+                else:
+                    send_to_discord(payload)
             except Exception:
                 logger.exception("Failed to prepare or send Discord notification")
 

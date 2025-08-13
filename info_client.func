@@ -65,3 +65,12 @@ function .match2(~slot, *)
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
 }
+
+function .upload_match(~slot, *)
+{
+  sp_sc_func_exec info_client
+  sp_sc_func_exec info_server ".upload_match" $~slot
+
+  sp_sv_print_client #~slot " OK."
+  sp_sv_print_client #~slot " The screenshot will be uploaded to Discord."
+}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 import requests
 from dotenv import load_dotenv
@@ -92,3 +92,36 @@ def send_to_discord(payload: dict) -> None:
             logger.info("Message sent to Discord.")
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to send message to Discord: %s", exc)
+
+
+def upload_image_to_discord(file_path: str, payload: Optional[dict] = None) -> Optional[dict]:
+    """Upload an image file to the Discord webhook as multipart form data.
+
+    Returns the response JSON (if any) or None on failure. Many webhooks return an empty
+    body on success (204), so callers should not rely on a JSON body being present.
+    """
+    load_dotenv()
+    webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+    if not webhook_url:
+        logger.error("DISCORD_WEBHOOK_URL is not set. Skipping Discord upload.")
+        return None
+    try:
+        data = payload or {}
+        with open(file_path, "rb") as fp:
+            files = {"file": (os.path.basename(file_path), fp, "image/png")}
+            response = requests.post(webhook_url, data={"payload_json": json_dumps(data)}, files=files, timeout=20)
+        if response.status_code not in (200, 204):
+            logger.error("Error uploading image to Discord: %s - %s", response.status_code, response.text)
+            return None
+        try:
+            return response.json()
+        except Exception:
+            return None
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to upload image to Discord: %s", exc)
+        return None
+
+
+def json_dumps(obj: dict) -> str:
+    import json
+    return json.dumps(obj, separators=(",", ":"))
