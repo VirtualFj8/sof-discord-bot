@@ -303,3 +303,113 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
     except Exception as exc:  # noqa: BLE001
         logger.exception("Error saving the final image: %s", exc)
         return None
+
+
+def _load_conchars_local_fallback() -> Optional[Image.Image]:
+    try:
+        return Image.open(os.path.join(os.path.dirname(__file__), "assets", "conchars.png")).convert("RGBA")
+    except FileNotFoundError:
+        logger.error("Could not load 'conchars' spritesheet from PAKs or assets.")
+        return None
+
+
+def _collect_players_by_team(data: dict) -> tuple[list[dict], list[dict]]:
+    blue_players: list[dict] = []
+    red_players: list[dict] = []
+    for player_data in list(data.get("players", [])):
+        if player_data is None:
+            continue
+        try:
+            player_data["name"] = base64.b64decode(player_data["name"]).decode("latin-1")
+        except Exception:  # noqa: BLE001
+            player_data["name"] = "decode_error"
+        team_val = player_data.get("team")
+        if team_val == 1:
+            blue_players.append(player_data)
+        elif team_val == 2:
+            red_players.append(player_data)
+    return blue_players, red_players
+
+
+def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]:
+    """Overlay upload-match text using conchars and crop per specification.
+
+    - Crop: left=128, right=width-108, top=32, bottom=max(red,blue)*32 + 150 + 16 + total_players*8
+    - Overlay header and one row per player using conchars.m32 at y = max(red,blue)*32 + 150
+    Returns the new file path (PNG) or None on failure.
+    """
+    try:
+        base_img = Image.open(image_path).convert("RGBA")
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to open image for postprocess: %s", exc)
+        return None
+
+    spritesheet: Optional[Image.Image] = SPRITESHEET_CONCHARS or _load_conchars_local_fallback()
+    if spritesheet is None:
+        return None
+
+    blue_players, red_players = _collect_players_by_team(data)
+    total_players = len(blue_players) + len(red_players)
+    max_col_players = max(len(blue_players), len(red_players))
+
+    # Compute baseline Y for overlay and bottom crop per request
+    overlay_base_y = max_col_players * 32 + 150
+    crop_bottom = overlay_base_y + 16 + (total_players * 8)
+
+    # Draw header and rows
+    header1 = "# CC FPS Ping Score PPM FRG DIE SK FLG REC Name"
+    header2 = " - -- --- --- ---- --- --- --- -- --- --- ---------------"
+    # Place within the area that will remain after left crop (x=128)
+    overlay_x = 128
+    draw_string_at(base_img, spritesheet, header1, overlay_x, overlay_base_y + 0, "#ffffff")
+    draw_string_at(base_img, spritesheet, header2, overlay_x, overlay_base_y + 8, "#b5b2b5")
+
+    # Build a flat ordered list of players (blue then red)
+    ordered_players = blue_players + red_players
+    for idx, p in enumerate(ordered_players):
+        # Safe getters
+        ping = int(p.get("ping", 0) or 0)
+        score = int(p.get("score", 0) or 0)
+        frags = int(p.get("frags", 0) or 0)
+        deaths = int(p.get("deaths", 0) or 0)
+        suicides = int(p.get("suicides", 0) or 0)
+        teamkills = int(p.get("teamkills", 0) or 0)
+        flags_captured = int(p.get("flags_captured", 0) or 0)
+        flags_recovered = int(p.get("flags_recovered", 0) or 0)
+        frames_total = int(p.get("frames_total", 0) or 0)
+        # Compute minutes for PPM; frames_total is 10 frames/sec
+        time_minutes = 0
+        try:
+            time_minutes = math.floor(math.floor(frames_total / 10) / 60)
+        except Exception:
+            time_minutes = 0
+        ppm = int(score / time_minutes) if time_minutes > 0 else 0
+        # Unknown columns
+        cc = p.get("cc", "??")
+        fps = p.get("fps", "-")
+        name = p.get("name", "unknown")
+
+        # SK column mapped to teamkills; DIE column is deaths
+        row = f"{idx:<1} {cc:>2} {str(fps):>3} {ping:>4} {score:>4} {ppm:>3} {frags:>3} {deaths:>3} {teamkills:>2} {flags_captured:>3} {flags_recovered:>3} {name}"
+        draw_string_at(base_img, spritesheet, row, overlay_x, overlay_base_y + 16 + (idx * 8), "#ffffff")
+
+    # Perform crop
+    width, height = base_img.size
+    left = 128
+    top = 32
+    right = max(left + 1, width - 108)
+    bottom = min(height, max(top + 1, crop_bottom))
+    try:
+        cropped = base_img.crop((left, top, right, bottom))
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to crop upload-match image: %s", exc)
+        return None
+
+    # Save alongside original
+    new_path = os.path.join(os.path.dirname(image_path), "ss_upload.png")
+    try:
+        cropped.save(new_path)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to save cropped upload-match image: %s", exc)
+        return None
+    return new_path

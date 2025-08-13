@@ -6,7 +6,7 @@ from typing import Optional
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-from .scoreboard import gen_scoreboard_init, generate_screenshot_for_port
+from .scoreboard import gen_scoreboard_init, generate_screenshot_for_port, postprocess_upload_match_image
 from .exporter import read_data_from_sof_server
 from .discorder import generate_payload, send_to_discord, upload_image_to_discord
 from .logging_utils import get_logger
@@ -83,14 +83,22 @@ class ServerCfgEventHandler(FileSystemEventHandler):
                 caller_name = caller_name or "Unknown"
 
                 mode = server.get("mode") or ""
-                if mode == ".wantplay":
-                    custom_msg = "Competitive match is wanted"
-                elif mode == ".match1":
-                    custom_msg = "Match on the way! Need 1 (or odd-sized group)."
-                elif mode == ".match2":
-                    custom_msg = "Match on the way! Need 2 (or even-sized group)."
+                custom_text = server.get("msg") or None
+
+                # Determine needed players for match request modes
+                needed_players: Optional[int] = None
+                if mode in {".match1", ".want1"}:
+                    needed_players = 1
+                elif mode in {".match2", ".want2"}:
+                    needed_players = 2
+
+                # Default description if not provided via custom_text
+                if mode in {".wantmatch", ".match1", ".match2", ".want1", ".want2"}:
+                    custom_msg = custom_text or "Players on the server want a match. Who's in?"
+                elif mode == ".wantplay":
+                    custom_msg = custom_text or "Competitive match is wanted"
                 else:
-                    custom_msg = "Live scoreboard"
+                    custom_msg = custom_text or "Live scoreboard"
 
                 payload = generate_payload(
                     caller_name=caller_name,
@@ -99,11 +107,16 @@ class ServerCfgEventHandler(FileSystemEventHandler):
                     custom_msg=custom_msg,
                     total_players=total_players,
                     image_url=None,
+                    mode=mode,
+                    needed_players=needed_players,
                 )
                 mode = server.get("mode") or ""
                 if mode == ".upload_match" and image_path:
+                    # Post-process image per upload-match rules (overlay + crop)
+                    processed_path = postprocess_upload_match_image(image_path, exported_data)
+                    final_path = processed_path or image_path
                     # Upload as file to webhook so it lives in Discord
-                    upload_image_to_discord(image_path, {})
+                    upload_image_to_discord(final_path, {})
                 else:
                     send_to_discord(payload)
             except Exception:

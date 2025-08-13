@@ -44,38 +44,115 @@ def generate_payload(
     custom_msg: str | None = None,
     total_players: int | None = None,
     image_url: str | None = None,
+    mode: str | None = None,
+    needed_players: int | None = None,
 ) -> dict:
-    fields: List[dict] = [
-        {"name": "Red team", "value": ", ".join(list(red_team)) or "None", "inline": True},
-        {"name": "Blue team", "value": ", ".join(list(blue_team)) or "None", "inline": False},
-    ]
-    if total_players is not None:
-        fields.append({"name": "Total players", "value": str(total_players), "inline": True})
+    # Default fields shared across variants
+    fields: List[dict] = []
+    if mode in {".wantmatch", ".match1", ".match2", ".want1", ".want2"}:
+        title = "Match request"
+        if needed_players:
+            title = f"Match request: Need +{needed_players}"
 
-    embed: dict = {
-        "title": "SoF Live Scoreboard",
-        "description": custom_msg or "Now in-game",
-        "url": "https://www.sof1.org/",
-        "color": 3447003,
-        "thumbnail": {"url": "https://www.sof1.org/gallery/image/7656/medium"},
-        "author": {
-            "name": caller_name,
+        # Build an encouraging description
+        parts: List[str] = []
+        if custom_msg:
+            parts.append(f"> {custom_msg}")
+        if total_players is not None:
+            if total_players <= 1:
+                parts.append("There is a player on the server who wants a match.")
+            else:
+                parts.append("Some players on the server want a match.")
+        else:
+            parts.append("Players want a match.")
+        parts.append("Interested? Jump in now!")
+        description = "\n".join(parts)
+
+        # Highlight needed players if applicable
+        if needed_players is not None:
+            fields.append({
+                "name": "Needed",
+                "value": f"+{needed_players} player(s)",
+                "inline": True,
+            })
+        if total_players is not None:
+            fields.append({
+                "name": "Players online",
+                "value": str(total_players),
+                "inline": True,
+            })
+
+        # Show current names by team to make it personal
+        if red_team:
+            fields.append({"name": "Red team", "value": ", ".join(list(red_team)), "inline": True})
+        if blue_team:
+            fields.append({"name": "Blue team", "value": ", ".join(list(blue_team)), "inline": True})
+
+        # Color scheme tuned for urgency
+        color = 0x2ECC71  # green
+        if mode in {".match1", ".want1"}:
+            color = 0xF1C40F  # amber
+        if mode in {".match2", ".want2"}:
+            color = 0xE74C3C  # red
+
+        embed: dict = {
+            "title": title,
+            "description": description,
             "url": "https://www.sof1.org/",
-            "icon_url": "https://www.sof1.org/gallery/image/7656/medium",
-        },
-        "fields": fields,
-        "footer": {"text": "Sent from SoF Server", "icon_url": "https://www.sof1.org/gallery/image/7656/medium"},
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-    if image_url:
-        embed["image"] = {"url": image_url}
+            "color": color,
+            "thumbnail": {"url": "https://www.sof1.org/gallery/image/7656/medium"},
+            "author": {
+                "name": caller_name,
+                "url": "https://www.sof1.org/",
+                "icon_url": "https://www.sof1.org/gallery/image/7656/medium",
+            },
+            "fields": fields,
+            "footer": {"text": "React if you're in. Sent from SoF Server", "icon_url": "https://www.sof1.org/gallery/image/7656/medium"},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
 
-    return {
-        "username": "🔴 [LIVE] SoF Gamers",
-        "avatar_url": "https://www.sof1.org/gallery/image/7656/medium",
-        "content": "\n\u200b\n 🕹️ **SCOREBOARD** 🕹️\n\u200b\n ",
-        "embeds": [embed],
-    }
+        if image_url:
+            embed["image"] = {"url": image_url}
+
+        return {
+            "username": "📣 Match Request",
+            "avatar_url": "https://www.sof1.org/gallery/image/7656/medium",
+            "content": "\n\u200b\n 📣 **MATCH REQUEST** \n\u200b\n ",
+            "embeds": [embed],
+        }
+    else:
+        # Default scoreboard card
+        fields = [
+            {"name": "Red team", "value": ", ".join(list(red_team)) or "None", "inline": True},
+            {"name": "Blue team", "value": ", ".join(list(blue_team)) or "None", "inline": False},
+        ]
+        if total_players is not None:
+            fields.append({"name": "Total players", "value": str(total_players), "inline": True})
+
+        embed = {
+            "title": "SoF Live Scoreboard",
+            "description": custom_msg or "Now in-game",
+            "url": "https://www.sof1.org/",
+            "color": 3447003,
+            "thumbnail": {"url": "https://www.sof1.org/gallery/image/7656/medium"},
+            "author": {
+                "name": caller_name,
+                "url": "https://www.sof1.org/",
+                "icon_url": "https://www.sof1.org/gallery/image/7656/medium",
+            },
+            "fields": fields,
+            "footer": {"text": "Sent from SoF Server", "icon_url": "https://www.sof1.org/gallery/image/7656/medium"},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        if image_url:
+            embed["image"] = {"url": image_url}
+
+        return {
+            "username": "🔴 [LIVE] SoF Gamers",
+            "avatar_url": "https://www.sof1.org/gallery/image/7656/medium",
+            "content": "\n\u200b\n 🕹️ **SCOREBOARD** 🕹️\n\u200b\n ",
+            "embeds": [embed],
+        }
 
 
 def send_to_discord(payload: dict) -> None:

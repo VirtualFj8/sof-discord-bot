@@ -34,15 +34,24 @@ function info_client( )
   }
 }
 
-function info_server(~discord_mode, ~discord_slot)
+function info_server(~discord_mode, ~discord_slot, ~discord_msg)
 {
-  sp_sc_cvar_save info_server/server.cfg _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot
+  sp_sc_cvar_save info_server/server.cfg _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot ~discord_msg
 }
 
 function .wantplay(~slot, *)
 {
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".wantplay" $~slot
+  sp_sc_func_exec info_server ".wantplay" $~slot $*
+
+  sp_sv_print_client #~slot " OK."
+  sp_sv_print_client #~slot " The message has been sent to  Discord."
+}
+
+function .wantmatch(~slot, *)
+{
+  sp_sc_func_exec info_client
+  sp_sc_func_exec info_server ".wantmatch" $~slot $*
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
@@ -51,7 +60,7 @@ function .wantplay(~slot, *)
 function .match1(~slot, *)
 {
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".match1" $~slot
+  sp_sc_func_exec info_server ".match1" $~slot $*
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
@@ -60,7 +69,7 @@ function .match1(~slot, *)
 function .match2(~slot, *)
 {
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".match2" $~slot
+  sp_sc_func_exec info_server ".match2" $~slot $*
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
@@ -69,8 +78,26 @@ function .match2(~slot, *)
 function .upload_match(~slot, *)
 {
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".upload_match" $~slot
+  sp_sc_func_exec info_server ".upload_match" $~slot $*
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The screenshot will be uploaded to Discord."
+}
+
+function .want1(~slot, *)
+{
+  sp_sc_func_exec info_client
+  sp_sc_func_exec info_server ".want1" $~slot $*
+
+  sp_sv_print_client #~slot " OK."
+  sp_sv_print_client #~slot " The message has been sent to  Discord."
+}
+
+function .want2(~slot, *)
+{
+  sp_sc_func_exec info_client
+  sp_sc_func_exec info_server ".want2" $~slot $*
+
+  sp_sv_print_client #~slot " OK."
+  sp_sv_print_client #~slot " The message has been sent to  Discord."
 }
