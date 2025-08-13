@@ -45,6 +45,21 @@ class ServerCfgEventHandler(FileSystemEventHandler):
             exported_data = read_data_from_sof_server(port, sofplus_data_path)
             if exported_data is None:
                 return
+            # Skip if there are zero active (non-spectator) players
+            players = exported_data.get("players", [])
+            active_count = 0
+            for p in players:
+                if not p:
+                    continue
+                try:
+                    if int(p.get("spectator", 0) or 0) != 0:
+                        continue
+                except Exception:
+                    pass
+                active_count += 1
+            if active_count == 0:
+                logger.info("No active players; skipping screenshot and Discord notification.")
+                return
             image_path = generate_screenshot_for_port(port, sofplus_data_path, exported_data)
             # Build and send Discord notification (optional, requires DISCORD_WEBHOOK_URL)
             try:
@@ -56,6 +71,11 @@ class ServerCfgEventHandler(FileSystemEventHandler):
                 for p in players:
                     if not p:
                         continue
+                    try:
+                        if int(p.get("spectator", 0) or 0) != 0:
+                            continue
+                    except Exception:
+                        pass
                     total_players += 1
                     # Names are base64-encoded in files
                     name_val = p.get("name", "")

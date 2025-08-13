@@ -258,6 +258,16 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
         logger.error("server_data is missing in data")
         return None
 
+    # Early exit if no active (non-spectator) players
+    try:
+        players_list = list(data.get("players", []))
+        has_active = any(p and int(p.get("spectator", 0) or 0) == 0 for p in players_list)
+        if not has_active:
+            logger.info("No active players; not generating screenshot.")
+            return None
+    except Exception:
+        pass
+
     server_data = data["server"]
     logger.info("Triggered screenshot generation for port %s", port)
 
@@ -429,7 +439,7 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     server_info = data.get("server", {})
     map_display = str(server_info.get("map_current", "unknown")) or "unknown"
     hostname = str(server_info.get("hostname", "unknown host")) or "unknown host"
-    utc_now = datetime.utcnow().strftime("UTC %d/%m/%y %H:%M")
+    utc_now = datetime.utcnow().strftime("%d/%m/%y %H:%M utc")
     width, height = base_img.size
     crop_left = 128
     crop_right = max(crop_left + 1, width - 108)

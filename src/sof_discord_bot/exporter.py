@@ -39,6 +39,8 @@ def load_server_data(filepath: str) -> Dict[str, Any]:
                             server_data[clean_key] = value
                     else:
                         server_data[clean_key] = value
+                else:
+                    server_data[key] = value
     except Exception as exc:  # noqa: BLE001
         logger.exception("Error processing server config file %s: %s", filepath, exc)
     return server_data
