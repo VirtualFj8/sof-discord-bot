@@ -436,8 +436,8 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
 
     # Compute baseline Y for overlay and bottom crop per request
     overlay_base_y = max_col_players * 32 + 150
-    # Add 8px padding below the last stats row
-    crop_bottom = overlay_base_y + 16 + (total_players * 8) + 8
+    # Add 8px padding below the last stats row and shift scoreboard down by 8px
+    crop_bottom = overlay_base_y + 32 + (total_players * 8)
 
     # Draw top info rows (all left-aligned):
     # Row 1 at y=32 (lands at 0..8 after crop): Time
@@ -450,20 +450,20 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     width, height = base_img.size
     crop_left = CROP_LEFT
     crop_right = max(crop_left + 1, width - CROP_RIGHT_MARGIN)
-    # Row 1: time left
-    draw_string_at(base_img, spritesheet, utc_now, crop_left, 32, "#ffffff")
+    # Row 1: time left (shifted down by 8px to provide top padding after crop)
+    draw_string_at(base_img, spritesheet, utc_now, crop_left, 40, "#ffffff")
     # Row 2: hostname left with inline colors (no override)
-    draw_string_at(base_img, spritesheet, hostname, crop_left, 40)
+    draw_string_at(base_img, spritesheet, hostname, crop_left, 48)
     # Row 3: map name left
-    draw_string_at(base_img, spritesheet, map_display, crop_left, 48, "#ffffff")
+    draw_string_at(base_img, spritesheet, map_display, crop_left, 56, "#ffffff")
 
     # Draw header and rows
     header1 = " # CC FPS Ping Score PPM FRG DIE SK FLG REC Name"
     header2 = "-- -- --- ---- ----- --- --- --- -- --- --- ---------------"
     # Place within the area that will remain after left crop (x=128)
     overlay_x = CROP_LEFT
-    draw_string_at(base_img, spritesheet, header1, overlay_x, overlay_base_y + 0, "#ffffff")
-    draw_string_at(base_img, spritesheet, header2, overlay_x, overlay_base_y + 8, "#b5b2b5")
+    draw_string_at(base_img, spritesheet, header1, overlay_x, overlay_base_y + 8, "#ffffff")
+    draw_string_at(base_img, spritesheet, header2, overlay_x, overlay_base_y + 16, "#b5b2b5")
 
     # Build a flat ordered list of players sorted solely by slot id
     ordered_players = sorted(blue_players + red_players, key=lambda t: t[0])
@@ -495,7 +495,7 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
         team_val = p.get("team", 0)
 
         # Draw slot id in team color, rest of columns white, then name with in-string color codes
-        row_y = overlay_base_y + 16 + (row_index * 8)
+        row_y = overlay_base_y + 24 + (row_index * 8)
         # Slot column width is 2 chars; right-align to match header dashes
         slot_text = f"{slot:>2}"
         slot_color = "#0000ff" if team_val == 1 else ("#ff0000" if team_val == 2 else "#ffffff")
