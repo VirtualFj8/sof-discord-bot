@@ -103,7 +103,7 @@ class ServerCfgEventHandler(FileSystemEventHandler):
                 mode = server.get("mode") or ""
                 if mode == ".upload_match" and image_path:
                     # Upload as file to webhook so it lives in Discord
-                    upload_image_to_discord(image_path, payload)
+                    upload_image_to_discord(image_path, {})
                 else:
                     send_to_discord(payload)
             except Exception:
