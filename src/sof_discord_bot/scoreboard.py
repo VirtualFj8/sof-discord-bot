@@ -101,7 +101,11 @@ def load_conchars_from_paks(sof_dir: str) -> Optional[Image.Image]:
     if not data:
         return None
     try:
-        return Image.open(BytesIO(data)).convert("RGBA")
+        mh = m32lib.MipHeader("conchars.m32", data)
+        w = int(mh.width.read()[0])
+        h = int(mh.height.read()[0])
+        img = Image.frombytes("RGBA", (w, h), mh.imgdata())
+        return img
     except Exception as exc:  # noqa: BLE001
         logger.warning("Failed to load conchars from PAKs: %s", exc)
         return None
