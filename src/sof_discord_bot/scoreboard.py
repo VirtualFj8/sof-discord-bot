@@ -490,11 +490,25 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
 
         # Draw slot id in team color, rest of columns white, then name with in-string color codes
         row_y = overlay_base_y + 16 + (row_index * 8)
-        slot_text = str(slot)
+        # Slot column width is 2 chars; right-align to match header dashes
+        slot_text = f"{slot:>2}"
         slot_color = "#0000ff" if team_val == 1 else ("#ff0000" if team_val == 2 else "#ffffff")
         draw_string_at(base_img, spritesheet, slot_text, overlay_x, row_y, slot_color)
 
-        columns_text = f" {cc:>2} {str(fps):>3} {ping:>4} {score:>4} {ppm:>3} {frags:>3} {deaths:>3} {suicides:>2} {flags_captured:>3} {flags_recovered:>3} "
+        # Right-align each numeric/stat field to the width implied by header hyphens
+        # CC:2 FPS:3 Ping:4 Score:5 PPM:3 FRG:3 DIE:3 SK:2 FLG:3 REC:3
+        columns_text = (
+            f" {cc:>2}"
+            f" {str(fps):>3}"
+            f" {ping:>4}"
+            f" {score:>5}"
+            f" {ppm:>3}"
+            f" {frags:>3}"
+            f" {deaths:>3}"
+            f" {suicides:>2}"
+            f" {flags_captured:>3}"
+            f" {flags_recovered:>3} "
+        )
         x_after_slot = overlay_x + (len(slot_text) * 8)
         draw_string_at(base_img, spritesheet, columns_text, x_after_slot, row_y, "#ffffff")
 
