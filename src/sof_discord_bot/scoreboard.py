@@ -294,18 +294,49 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
             except FileNotFoundError:
                 logger.warning("No background found for map %s", map_full_name)
 
-    if not canvas_image:
-        logger.info("All background sources failed. Creating a black 640x480 canvas.")
-        canvas_image = Image.new("RGBA", (640, 480), "black")
-    else:
-        overlay = Image.new("RGBA", canvas_image.size, (0, 0, 0, 128))
-        # Darken only the background; draw HUD/text on a separate foreground layer later
-        canvas_image = Image.alpha_composite(canvas_image.convert("RGBA"), overlay)
+    # Prepare a smoky black base (background fill outside map area)
+    base_bg = Image.new("RGBA", (640, 480), (0, 0, 0, 220))
 
-    # Draw HUD/text/portraits on a transparent foreground and composite over darkened background
-    foreground_layer = Image.new("RGBA", canvas_image.size, (0, 0, 0, 0))
+    # Compute target cropped region geometry to fit the background within
+    players_list = list(data.get("players", []))
+    blue_count = sum(1 for p in players_list if p and p.get("team") == 1)
+    red_count = sum(1 for p in players_list if p and p.get("team") == 2)
+    total_players = sum(1 for p in players_list if p)
+    max_col_players = max(blue_count, red_count)
+    overlay_base_y = max_col_players * 32 + 150
+    # Include bottom padding (+8) consistent with postprocess
+    intended_bottom = overlay_base_y + 16 + (total_players * 8) + 8
+    target_left, target_top = 128, 32
+    target_right = 640 - 108
+    target_bottom = min(480, max(target_top + 1, intended_bottom))
+    region_w = max(1, target_right - target_left)
+    region_h = max(1, target_bottom - target_top)
+
+    # Resize map background to fit inside the target region, preserving aspect ratio
+    if canvas_image is not None:
+        try:
+            scale = min(region_w / canvas_image.width, region_h / canvas_image.height)
+            scaled_w = max(1, int(canvas_image.width * scale))
+            scaled_h = max(1, int(canvas_image.height * scale))
+            try:
+                resample = Image.LANCZOS  # Pillow>=3.4
+            except Exception:
+                resample = Image.BICUBIC
+            map_scaled = canvas_image.resize((scaled_w, scaled_h), resample=resample)
+            # Darken only the map image
+            overlay = Image.new("RGBA", map_scaled.size, (0, 0, 0, 128))
+            map_dark = Image.alpha_composite(map_scaled.convert("RGBA"), overlay)
+            # Center within target region
+            paste_x = target_left + (region_w - scaled_w) // 2
+            paste_y = target_top + (region_h - scaled_h) // 2
+            base_bg.paste(map_dark, (paste_x, paste_y), map_dark)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to scale/paste background: %s", exc)
+
+    # Draw HUD/text/portraits on a transparent foreground and composite over darkened/background-filled base
+    foreground_layer = Image.new("RGBA", base_bg.size, (0, 0, 0, 0))
     draw_screenshot_hud(spritesheet, data, foreground_layer)
-    final_composite = Image.alpha_composite(canvas_image.convert("RGBA"), foreground_layer)
+    final_composite = Image.alpha_composite(base_bg.convert("RGBA"), foreground_layer)
 
     try:
         final_path = os.path.expanduser(output_path)
@@ -381,8 +412,8 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     draw_string_at(base_img, spritesheet, map_display, map_x, 32, "#ffffff")
 
     # Draw header and rows
-    header1 = "# CC FPS Ping Score PPM FRG DIE SK FLG REC Name"
-    header2 = " - -- --- --- ---- --- --- --- -- --- --- ---------------"
+    header1 = " # CC FPS Ping Score PPM FRG DIE SK FLG REC Name"
+    header2 = "-- -- --- ---- ----- --- --- --- -- --- --- ---------------"
     # Place within the area that will remain after left crop (x=128)
     overlay_x = 128
     draw_string_at(base_img, spritesheet, header1, overlay_x, overlay_base_y + 0, "#ffffff")
