@@ -41,8 +41,17 @@ function info_server(~discord_mode, ~discord_slot, ~discord_msg)
 
 function .wantplay(~slot, *)
 {
+  set ~count 1
+  set ~extramsg
+  sp_sc_flow_while number cvar ~count <= val #~0
+  {
+    sp_sc_cvar_copy ~val ~$~count
+    sset ~extramsg #~extramsg #~val
+    add ~count 1
+  }
+
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".wantplay" $~slot $*
+  sp_sc_func_exec info_server ".wantplay" $~slot #~extramsg
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
@@ -50,8 +59,17 @@ function .wantplay(~slot, *)
 
 function .wantmatch(~slot, *)
 {
+  set ~count 1
+  set ~extramsg
+  sp_sc_flow_while number cvar ~count <= val #~0
+  {
+    sp_sc_cvar_copy ~val ~$~count
+    sset ~extramsg #~extramsg #~val
+    add ~count 1
+  }
+
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".wantmatch" $~slot $*
+  sp_sc_func_exec info_server ".wantmatch" $~slot #~extramsg
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
@@ -59,8 +77,17 @@ function .wantmatch(~slot, *)
 
 function .match1(~slot, *)
 {
+  set ~count 1
+  set ~extramsg
+  sp_sc_flow_while number cvar ~count <= val #~0
+  {
+    sp_sc_cvar_copy ~val ~$~count
+    sset ~extramsg #~extramsg #~val
+    add ~count 1
+  }
+
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".match1" $~slot $*
+  sp_sc_func_exec info_server ".match1" $~slot #~extramsg
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
@@ -68,8 +95,17 @@ function .match1(~slot, *)
 
 function .match2(~slot, *)
 {
+  set ~count 1
+  set ~extramsg
+  sp_sc_flow_while number cvar ~count <= val #~0
+  {
+    sp_sc_cvar_copy ~val ~$~count
+    sset ~extramsg #~extramsg #~val
+    add ~count 1
+  }
+
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".match2" $~slot $*
+  sp_sc_func_exec info_server ".match2" $~slot #~extramsg
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
@@ -77,8 +113,17 @@ function .match2(~slot, *)
 
 function .upload_match(~slot, *)
 {
+  set ~count 1
+  set ~extramsg
+  sp_sc_flow_while number cvar ~count <= val #~0
+  {
+    sp_sc_cvar_copy ~val ~$~count
+    sset ~extramsg #~extramsg #~val
+    add ~count 1
+  }
+
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".upload_match" $~slot $*
+  sp_sc_func_exec info_server ".upload_match" $~slot #~extramsg
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The screenshot will be uploaded to Discord."
@@ -86,8 +131,17 @@ function .upload_match(~slot, *)
 
 function .want1(~slot, *)
 {
+  set ~count 1
+  set ~extramsg
+  sp_sc_flow_while number cvar ~count <= val #~0
+  {
+    sp_sc_cvar_copy ~val ~$~count
+    sset ~extramsg #~extramsg #~val
+    add ~count 1
+  }
+
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".want1" $~slot $*
+  sp_sc_func_exec info_server ".want1" $~slot #~extramsg
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
@@ -95,8 +149,17 @@ function .want1(~slot, *)
 
 function .want2(~slot, *)
 {
+  set ~count 1
+  set ~extramsg
+  sp_sc_flow_while number cvar ~count <= val #~0
+  {
+    sp_sc_cvar_copy ~val ~$~count
+    sset ~extramsg #~extramsg #~val
+    add ~count 1
+  }
+
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".want2" $~slot $*
+  sp_sc_func_exec info_server ".want2" $~slot #~extramsg
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
