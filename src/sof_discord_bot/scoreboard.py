@@ -61,6 +61,16 @@ def _decode_player_name(value: Optional[str]) -> str:
         return value
 
 
+def _has_effective_inline_color(value: str) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    # Color control chars only take effect on subsequent printable chars.
+    # Ignore any trailing control chars at the end of the string.
+    control_chars = ''.join(chr(i) for i in range(32))
+    trimmed = value.rstrip(control_chars)
+    return any(ord(ch) < 32 for ch in trimmed)
+
+
 def load_all_portraits(sof_dir: str) -> dict[str, Image.Image]:
     portrait_images: dict[str, Image.Image] = {}
     base_path_in_pak = "ghoul/pmodels/portraits"
@@ -519,7 +529,15 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
         draw_string_at(base_img, spritesheet, columns_text, x_after_slot, row_y, "#ffffff")
 
         x_before_name = x_after_slot + (len(columns_text) * 8)
-        draw_string_at(base_img, spritesheet, name, x_before_name, row_y)
+        # Use white when no inline color codes are present; otherwise respect in-name colors
+        try:
+            has_inline_color = _has_effective_inline_color(name)
+        except Exception:
+            has_inline_color = False
+        if has_inline_color:
+            draw_string_at(base_img, spritesheet, name, x_before_name, row_y)
+        else:
+            draw_string_at(base_img, spritesheet, name, x_before_name, row_y, "#ffffff")
 
     # Perform crop
     width, height = base_img.size
