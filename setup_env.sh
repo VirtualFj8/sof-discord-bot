@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -euo pipefail
-
 # Define the name of the virtual environment directory
 VENV_DIR="sof-discord-venv"
 REQUIREMENTS_FILE="requirements.txt"
@@ -48,8 +46,13 @@ fi
 
 if [[ $SOURCED -eq 1 ]]; then
   echo "Activating virtual environment in current shell..."
+  # Avoid leaking -e/-u/-o pipefail to the parent shell and avoid activation failures exiting the shell.
+  OLD_OPTS=$(set +o)
+  set +e +u
+  set +o pipefail
   # shellcheck disable=SC1090
   source "$ACTIVATE_PATH"
+  eval "$OLD_OPTS"
   echo "Virtual environment '$VENV_DIR' is now active."
   echo "To deactivate later, run: deactivate"
 else
