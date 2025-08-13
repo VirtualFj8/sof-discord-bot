@@ -82,6 +82,8 @@ def load_player_data_from_files(directory_path: str) -> List[Optional[dict]]:
                         "flags_captured",
                         "flags_recovered",
                         "frames_total",
+                        "ppm_now",
+                        "fps",
                     ]:
                         try:
                             player_data[key] = int(value)

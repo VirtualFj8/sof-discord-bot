@@ -44,6 +44,16 @@ def gen_scoreboard_init(sof_dir: str) -> dict[str, Image.Image]:
     return ALL_PORTRAITS
 
 
+def _decode_player_name(value: Optional[str]) -> str:
+    if not value:
+        return "Unknown"
+    try:
+        return base64.b64decode(value).decode("latin-1")
+    except Exception:
+        # If it's already decoded or not valid base64, return as-is
+        return value
+
+
 def load_all_portraits(sof_dir: str) -> dict[str, Image.Image]:
     portrait_images: dict[str, Image.Image] = {}
     base_path_in_pak = "ghoul/pmodels/portraits"
@@ -165,10 +175,8 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
     for player_data in list(data.get("players", [])):
         if player_data is None:
             continue
-        try:
-            player_data["name"] = base64.b64decode(player_data["name"]).decode("latin-1")
-        except Exception:  # noqa: BLE001
-            player_data["name"] = "decode_error"
+        if isinstance(player_data.get("name"), str):
+            player_data["name"] = _decode_player_name(player_data["name"]) 
         if player_data.get("team") == 1:
             blue_players.append(player_data)
             blue_score += int(player_data.get("score", 0))
@@ -313,21 +321,20 @@ def _load_conchars_local_fallback() -> Optional[Image.Image]:
         return None
 
 
-def _collect_players_by_team(data: dict) -> tuple[list[dict], list[dict]]:
-    blue_players: list[dict] = []
-    red_players: list[dict] = []
-    for player_data in list(data.get("players", [])):
+def _collect_players_by_team(data: dict) -> tuple[list[tuple[int, dict]], list[tuple[int, dict]]]:
+    blue_players: list[tuple[int, dict]] = []
+    red_players: list[tuple[int, dict]] = []
+    for slot, player_data in enumerate(list(data.get("players", []))):
         if player_data is None:
             continue
-        try:
-            player_data["name"] = base64.b64decode(player_data["name"]).decode("latin-1")
-        except Exception:  # noqa: BLE001
-            player_data["name"] = "decode_error"
+        # Ensure we only decode once from exporter-provided base64
+        if isinstance(player_data.get("name"), str):
+            player_data["name"] = _decode_player_name(player_data["name"]) 
         team_val = player_data.get("team")
         if team_val == 1:
-            blue_players.append(player_data)
+            blue_players.append((slot, player_data))
         elif team_val == 2:
-            red_players.append(player_data)
+            red_players.append((slot, player_data))
     return blue_players, red_players
 
 
@@ -366,32 +373,44 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
 
     # Build a flat ordered list of players (blue then red)
     ordered_players = blue_players + red_players
-    for idx, p in enumerate(ordered_players):
+    for row_index, (slot, p) in enumerate(ordered_players):
         # Safe getters
         ping = int(p.get("ping", 0) or 0)
         score = int(p.get("score", 0) or 0)
         frags = int(p.get("frags", 0) or 0)
         deaths = int(p.get("deaths", 0) or 0)
         suicides = int(p.get("suicides", 0) or 0)
-        teamkills = int(p.get("teamkills", 0) or 0)
         flags_captured = int(p.get("flags_captured", 0) or 0)
         flags_recovered = int(p.get("flags_recovered", 0) or 0)
         frames_total = int(p.get("frames_total", 0) or 0)
-        # Compute minutes for PPM; frames_total is 10 frames/sec
-        time_minutes = 0
+        # PPM from server if present; otherwise fallback to computed
         try:
-            time_minutes = math.floor(math.floor(frames_total / 10) / 60)
+            ppm = int(p.get("ppm_now", 0) or 0)
         except Exception:
-            time_minutes = 0
-        ppm = int(score / time_minutes) if time_minutes > 0 else 0
-        # Unknown columns
-        cc = p.get("cc", "??")
+            ppm = 0
+        if ppm == 0:
+            try:
+                time_minutes = math.floor(math.floor(frames_total / 10) / 60)
+                ppm = int(score / time_minutes) if time_minutes > 0 else 0
+            except Exception:
+                ppm = 0
+        cc = p.get("country", "??")
         fps = p.get("fps", "-")
         name = p.get("name", "unknown")
+        team_val = p.get("team", 0)
 
-        # SK column mapped to teamkills; DIE column is deaths
-        row = f"{idx:<1} {cc:>2} {str(fps):>3} {ping:>4} {score:>4} {ppm:>3} {frags:>3} {deaths:>3} {teamkills:>2} {flags_captured:>3} {flags_recovered:>3} {name}"
-        draw_string_at(base_img, spritesheet, row, overlay_x, overlay_base_y + 16 + (idx * 8), "#ffffff")
+        # Draw slot id in team color, rest of columns white, then name with in-string color codes
+        row_y = overlay_base_y + 16 + (row_index * 8)
+        slot_text = str(slot)
+        slot_color = "#0000ff" if team_val == 1 else ("#ff0000" if team_val == 2 else "#ffffff")
+        draw_string_at(base_img, spritesheet, slot_text, overlay_x, row_y, slot_color)
+
+        columns_text = f" {cc:>2} {str(fps):>3} {ping:>4} {score:>4} {ppm:>3} {frags:>3} {deaths:>3} {suicides:>2} {flags_captured:>3} {flags_recovered:>3} "
+        x_after_slot = overlay_x + (len(slot_text) * 8)
+        draw_string_at(base_img, spritesheet, columns_text, x_after_slot, row_y, "#ffffff")
+
+        x_before_name = x_after_slot + (len(columns_text) * 8)
+        draw_string_at(base_img, spritesheet, name, x_before_name, row_y)
 
     # Perform crop
     width, height = base_img.size
