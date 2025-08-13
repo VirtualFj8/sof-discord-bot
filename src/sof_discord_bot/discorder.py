@@ -128,7 +128,7 @@ def generate_payload(
         "color": color,
         "thumbnail": {"url": "https://www.sof1.org/gallery/image/7656/medium"},
         "author": {
-            "name": caller_name_clean,
+            "name": caller_name_clean + " is requesting a match!",
             "url": "https://www.sof1.org/",
             "icon_url": "https://www.sof1.org/gallery/image/7656/medium",
         },
