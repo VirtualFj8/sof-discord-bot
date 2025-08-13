@@ -433,9 +433,10 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     # Add 8px padding below the last stats row
     crop_bottom = overlay_base_y + 16 + (total_players * 8) + 8
 
-    # Draw top info rows:
-    # Row 1 at y=32 (lands at 0..8 after crop): Left: UTC time, Right: hostname
-    # Row 2 at y=40 (lands at 8..16 after crop): Centered map name
+    # Draw top info rows (all left-aligned):
+    # Row 1 at y=32 (lands at 0..8 after crop): Time
+    # Row 2 at y=40 (lands at 8..16 after crop): Hostname (with inline color codes)
+    # Row 3 at y=48 (lands at 16..24 after crop): Map name
     server_info = data.get("server", {})
     map_display = str(server_info.get("map_current", "unknown")) or "unknown"
     hostname = str(server_info.get("hostname", "unknown host")) or "unknown host"
@@ -443,15 +444,12 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     width, height = base_img.size
     crop_left = 128
     crop_right = max(crop_left + 1, width - 108)
-    # Row 1: time (left) and hostname (right)
+    # Row 1: time left
     draw_string_at(base_img, spritesheet, utc_now, crop_left, 32, "#ffffff")
-    host_w = len(hostname) * 8
-    right_x = max(crop_left, crop_right - host_w)
-    draw_string_at(base_img, spritesheet, hostname, right_x, 32, "#ffffff")
-    # Row 2: centered map name (8 px lower)
-    center_text_w = len(map_display) * 8
-    center_x = crop_left + max(0, ((crop_right - crop_left) - center_text_w) // 2)
-    draw_string_at(base_img, spritesheet, map_display, center_x, 40, "#ffffff")
+    # Row 2: hostname left with inline colors (no override)
+    draw_string_at(base_img, spritesheet, hostname, crop_left, 40)
+    # Row 3: map name left
+    draw_string_at(base_img, spritesheet, map_display, crop_left, 48, "#ffffff")
 
     # Draw header and rows
     header1 = " # CC FPS Ping Score PPM FRG DIE SK FLG REC Name"
