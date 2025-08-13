@@ -96,7 +96,7 @@ def unpack_from_paks(sof_dir: str, relative_path: str) -> Optional[bytes]:
 
 def load_conchars_from_paks(sof_dir: str) -> Optional[Image.Image]:
     """Load pics/console/conchars.png from game PAKs as a spritesheet image."""
-    rel = os.path.join("pics", "console", "conchars.png")
+    rel = os.path.join("pics", "console", "conchars.m32")
     data = unpack_from_paks(sof_dir, rel)
     if not data:
         return None
