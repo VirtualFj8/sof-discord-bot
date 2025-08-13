@@ -8,11 +8,8 @@ import requests
 from PIL import Image
 
 from .vendor.pak import unpack_one_to_memory
-from . import vendor
 from .logging_utils import get_logger
-
-# NOTE: vendor.m32lib will be populated at runtime via relative import
-import importlib
+from .vendor import m32lib
 
 logger = get_logger(__name__)
 
@@ -51,8 +48,6 @@ def load_all_portraits(sof_dir: str) -> dict[str, Image.Image]:
         ],
         "pak2.pak": ["assault.m32","brick.m32","cobra.m32","commando.m32","jersey.m32","widowmaker.m32"],
     }
-
-    m32lib = importlib.import_module("sof_discord_bot.vendor.m32lib")
 
     for pak_dir, filenames in portrait_sources.items():
         for filename in filenames:

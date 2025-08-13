@@ -1,2 +1,169 @@
-# Vendored from project root m32lib.py
-from ...m32lib import *
+# Fully vendored copy of m32lib.py to avoid relying on repo root imports
+import struct
+import sys
+
+MIPLEVELS = 16
+
+
+def getTypeSize(tipe):
+    if tipe == 'int':
+        return 4
+    if tipe == 'uint':
+        return 4
+    if tipe == 'string':
+        return 0
+    if tipe == 'float':
+        return 4
+    return 0
+
+
+class Field:
+    @staticmethod
+    def memToString(mem, tipe, size=128):
+        mem = mem.tobytes()
+        if tipe == 'int':
+            outstring = str(struct.unpack('<i', mem)[0])
+        elif tipe == 'uint':
+            outstring = str(struct.unpack('<I', mem)[0])
+        elif tipe == 'string':
+            outstring = str(struct.unpack(str(size) + 's', mem)[0])
+            nil = outstring.find('\0')
+            if nil >= 0:
+                outstring = outstring[:nil]
+        elif tipe == 'float':
+            outstring = str(struct.unpack('<f', mem)[0])
+        return outstring
+
+    def __init__(self, name, size, tipe, view=None):
+        self.name = name
+        self.size = size
+        self.tipe = tipe
+        self.memview = None if view is None else view[:size]
+
+    def writeBasic(self, mem, tipe, data):
+        if tipe == 'int':
+            struct.pack_into('<i', mem, 0, data)
+        elif tipe == 'uint':
+            struct.pack_into('<I', mem, 0, data)
+        elif tipe == 'string':
+            encoded_data = data.encode()
+            mem[0:len(encoded_data)] = encoded_data
+            mem[len(encoded_data)] = 0
+        elif tipe == 'float':
+            struct.pack_into('<f', mem, 0, data)
+
+    def write(self, val, list_offset=0):
+        if self.memview is None:
+            return
+        tipe = self.tipe
+        if tipe.find('list_') == 0:
+            tipe = self.tipe[5:]
+            ts = getTypeSize(tipe)
+            self.writeBasic(self.memview[list_offset * ts:list_offset * ts + ts], tipe, val)
+        else:
+            self.writeBasic(self.memview, tipe, val)
+
+    def read(self):
+        if self.tipe.find('list_') == 0:
+            return self.toList()
+        return self.toString()
+
+    def toString(self):
+        return Field.memToString(self.memview, self.tipe)
+
+    def toList(self):
+        tipe = self.tipe[5:]
+        ts = getTypeSize(tipe)
+        return [Field.memToString(self.memview[x:x + ts], tipe) for x in range(0, self.size, ts)]
+
+
+class MipHeader:
+    fields = [
+        Field('version', 4, 'int'),
+        Field('name', 128, 'string'),
+        Field('altname', 128, 'string'),
+        Field('animname', 128, 'string'),
+        Field('damagename', 128, 'string'),
+        Field('width', MIPLEVELS * 4, 'list_uint'),
+        Field('height', MIPLEVELS * 4, 'list_uint'),
+        Field('offsets', MIPLEVELS * 4, 'list_uint'),
+        Field('flags', 4, 'int'),
+        Field('contents', 4, 'int'),
+        Field('value', 4, 'int'),
+        Field('scale_x', 4, 'float'),
+        Field('scale_y', 4, 'float'),
+        Field('mip_scale', 4, 'int'),
+        Field('dt_name', 128, 'string'),
+        Field('dt_scale_x', 4, 'float'),
+        Field('dt_scale_y', 4, 'float'),
+        Field('dt_u', 4, 'float'),
+        Field('dt_v', 4, 'float'),
+        Field('dt_alpha', 4, 'float'),
+        Field('dt_src_blend_mode', 4, 'int'),
+        Field('dt_dst_blend_mode', 4, 'int'),
+        Field('flags2', 4, 'int'),
+        Field('damage_health', 4, 'float'),
+        Field('unused', 18 * 4, 'list_int'),
+    ]
+
+    def __init__(self, filename='', infileData=None, dictIn=None):
+        self.filename = filename
+        if infileData is not None:
+            self.file = bytearray(infileData)
+            mview = memoryview(self.file)
+            for field in MipHeader.fields:
+                f = Field(field.name, field.size, field.tipe, mview[:])
+                setattr(self, field.name, f)
+                mview = mview[field.size:]
+        elif dictIn is not None:
+            self.file = bytearray(968)
+            mview = memoryview(self.file)
+            for field in MipHeader.fields:
+                f = Field(field.name, field.size, field.tipe, mview[:])
+                if field.name in dictIn:
+                    if f.name in ("width", "height", "offsets"):
+                        for x in range(0, MIPLEVELS):
+                            f.write(dictIn[field.name][x], x)
+                    else:
+                        f.write(dictIn[field.name])
+                setattr(self, field.name, f)
+                mview = mview[field.size:]
+        else:
+            print("Error : please pass a file to this function")
+            sys.exit(1)
+
+    def header(self):
+        return memoryview(self.file)[:len(self)]
+
+    def imgdata(self):
+        return memoryview(self.file)[len(self): len(self) + int(self.width.read()[0]) * int(self.height.read()[0]) * 4]
+
+    def dump(self):
+        print("dumping contents of " + self.filename)
+        startview = memoryview(self.file)
+        for field in MipHeader.fields:
+            if field.tipe.find('list_') == 0:
+                tipe = field.tipe[5:]
+                ts = getTypeSize(tipe)
+                if ts == 0:
+                    print("Error : unsupported list")
+                    sys.exit(1)
+                for x in range(0, field.size, ts):
+                    u = len(field.name) + len(str(x)) + 2
+                    y = 30 - u
+                    if y < 0:
+                        y = 0
+                    field_str = Field.memToString(startview[:4], tipe)
+                    print(field.name + "[" + str(x) + "]" + " is" + y * ' ' + " : " + field_str)
+                    startview = startview[ts:]
+            else:
+                u = len(field.name)
+                y = 30 - u
+                if y < 0:
+                    y = 0
+                fld = getattr(self, field.name)
+                print(field.name + " is" + y * ' ' + " : " + fld.read())
+                startview = startview[fld.size:]
+
+    def __len__(self):
+        return 968
