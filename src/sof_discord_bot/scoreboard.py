@@ -195,7 +195,8 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
         y_base = 120 + (32 * i)
         skin = ALL_PORTRAITS.get(player.get("skin", "mullins"))
         if skin is not None:
-            canvas_image.paste(skin, (160, y_base), skin)
+            # Place red team portraits at the right column (aligned with text at x=372)
+            canvas_image.paste(skin, (340, y_base), skin)
         draw_string_at(canvas_image, spritesheet, player["name"], 372, y_base)
         draw_string_at(canvas_image, spritesheet, "Score:  ", 372, y_base + 8, "#b5b2b5")
         draw_string_at(canvas_image, spritesheet, str(player.get("score", 0)), 436, y_base + 8, "#ffffff")
