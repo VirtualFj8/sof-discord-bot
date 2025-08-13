@@ -361,7 +361,20 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
 
     # Compute baseline Y for overlay and bottom crop per request
     overlay_base_y = max_col_players * 32 + 150
-    crop_bottom = overlay_base_y + 16 + (total_players * 8)
+    # Add 8px padding below the last stats row
+    crop_bottom = overlay_base_y + 16 + (total_players * 8) + 8
+
+    # Draw map name at the future top of the cropped image (use top 8 px)
+    server_info = data.get("server", {})
+    map_full_name = str(server_info.get("map_current", "unknown"))
+    map_display = map_full_name if map_full_name else "unknown"
+    width, height = base_img.size
+    crop_left = 128
+    crop_right = max(crop_left + 1, width - 108)
+    map_text_width = len(map_display) * 8
+    map_x = crop_left + max(0, (crop_right - crop_left - map_text_width) // 2)
+    # Place at y=32 so that after top crop (32px) it sits at the very top (0..8px) of the final image
+    draw_string_at(base_img, spritesheet, map_display, map_x, 32, "#ffffff")
 
     # Draw header and rows
     header1 = "# CC FPS Ping Score PPM FRG DIE SK FLG REC Name"
@@ -385,7 +398,8 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
         frames_total = int(p.get("frames_total", 0) or 0)
         # PPM from server if present; otherwise fallback to computed
         try:
-            ppm = int(p.get("ppm_now", 0) or 0)
+            # .players uses ppm_best instead of ppm_now
+            ppm = int(p.get("ppm_best", 0) or 0)
         except Exception:
             ppm = 0
         if ppm == 0:
