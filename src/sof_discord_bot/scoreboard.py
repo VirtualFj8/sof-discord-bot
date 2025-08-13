@@ -299,13 +299,17 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
         canvas_image = Image.new("RGBA", (640, 480), "black")
     else:
         overlay = Image.new("RGBA", canvas_image.size, (0, 0, 0, 128))
+        # Darken only the background; draw HUD/text on a separate foreground layer later
         canvas_image = Image.alpha_composite(canvas_image.convert("RGBA"), overlay)
 
-    draw_screenshot_hud(spritesheet, data, canvas_image)
+    # Draw HUD/text/portraits on a transparent foreground and composite over darkened background
+    foreground_layer = Image.new("RGBA", canvas_image.size, (0, 0, 0, 0))
+    draw_screenshot_hud(spritesheet, data, foreground_layer)
+    final_composite = Image.alpha_composite(canvas_image.convert("RGBA"), foreground_layer)
 
     try:
         final_path = os.path.expanduser(output_path)
-        canvas_image.save(final_path)
+        final_composite.save(final_path)
         logger.info("Successfully created screenshot: %s", final_path)
         return final_path
     except Exception as exc:  # noqa: BLE001
