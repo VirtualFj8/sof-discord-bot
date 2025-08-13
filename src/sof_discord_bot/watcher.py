@@ -60,7 +60,7 @@ class ServerCfgEventHandler(FileSystemEventHandler):
             if active_count == 0:
                 logger.info("No active players; skipping screenshot and Discord notification.")
                 return
-            image_path = generate_screenshot_for_port(port, sofplus_data_path, exported_data)
+            
             # Build and send Discord notification (optional, requires DISCORD_WEBHOOK_URL)
             try:
                 server = exported_data.get("server", {})
@@ -81,9 +81,9 @@ class ServerCfgEventHandler(FileSystemEventHandler):
                     name_val = p.get("name", "")
                     try:
                         import base64
-                        decoded = base64.b64decode(name_val).decode("latin-1") if name_val else "Unknown"
+                        decoded = base64.b64decode(name_val).decode("latin-1") if name_val else ""
                     except Exception:
-                        decoded = "Unknown"
+                        decoded = ""
                     team_val = p.get("team")
                     if team_val == 1:
                         blue_team_names.append(decoded)
@@ -113,31 +113,32 @@ class ServerCfgEventHandler(FileSystemEventHandler):
                     needed_players = 2
 
                 # Default description if not provided via custom_text
-                if mode in {".wantmatch", ".match1", ".match2", ".want1", ".want2"}:
+                if mode in {".wantmatch", ".match1", ".match2", ".want1", ".want2", ".wantplay"}:
                     custom_msg = custom_text or "Players on the server want a match. Who's in?"
-                elif mode == ".wantplay":
-                    custom_msg = custom_text or "Competitive match is wanted"
-                else:
-                    custom_msg = custom_text or "Live scoreboard"
 
-                payload = generate_payload(
-                    caller_name=caller_name,
-                    red_team=red_team_names,
-                    blue_team=blue_team_names,
-                    custom_msg=custom_msg,
-                    total_players=total_players,
-                    image_url=None,
-                    mode=mode,
-                    needed_players=needed_players,
-                )
+                
                 mode = server.get("mode") or ""
-                if mode == ".upload_match" and image_path:
-                    # Post-process image per upload-match rules (overlay + crop)
-                    processed_path = postprocess_upload_match_image(image_path, exported_data)
-                    final_path = processed_path or image_path
-                    # Upload as file to webhook so it lives in Discord
-                    upload_image_to_discord(final_path, {})
+                if mode == ".upload_match":
+                    image_path = generate_screenshot_for_port(port, sofplus_data_path, exported_data)
+                    if image_path:
+                        # Post-process image per upload-match rules (overlay + crop)
+                        processed_path = postprocess_upload_match_image(image_path, exported_data)
+                        final_path = processed_path or image_path
+                        # Upload as file to webhook so it lives in Discord
+                        upload_image_to_discord(final_path, {})
                 else:
+                    payload = generate_payload(
+                        caller_name=caller_name,
+                        red_team=red_team_names,
+                        blue_team=blue_team_names,
+                        custom_msg=custom_msg,
+                        total_players=total_players,
+                        image_url=None,
+                        mode=mode,
+                        needed_players=needed_players,
+                        map_name=server.get("map_current"),
+                        hostname=server.get("hostname"),
+                    )
                     send_to_discord(payload)
             except Exception:
                 logger.exception("Failed to prepare or send Discord notification")
