@@ -184,7 +184,7 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
         x_offset += 8
 
 
-def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image) -> None:
+def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image, y_offset: int = 0) -> None:
     blue_players: list[dict] = []
     red_players: list[dict] = []
     blue_score = 0
@@ -210,7 +210,7 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
     red_players.sort(key=lambda p: int(p.get("score", 0)), reverse=True)
 
     for i, player in enumerate(blue_players):
-        y_base = 120 + (32 * i)
+        y_base = 120 + (32 * i) + y_offset
         skin = ALL_PORTRAITS.get(player.get("skin", "mullins"))
         if skin is not None:
             canvas_image.paste(skin, (160, y_base), skin)
@@ -223,7 +223,7 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
         draw_string_at(canvas_image, spritesheet, f"Time:   {time_min}", 192, y_base + 24, "#b5b2b5")
 
     for i, player in enumerate(red_players):
-        y_base = 120 + (32 * i)
+        y_base = 120 + (32 * i) + y_offset
         skin = ALL_PORTRAITS.get(player.get("skin", "mullins"))
         if skin is not None:
             # Place red team portraits at the right column (aligned with text at x=372)
@@ -236,25 +236,25 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
         time_min = math.floor(math.floor(int(frames_total) / 10) / 60)
         draw_string_at(canvas_image, spritesheet, f"Time:   {time_min}", 372, y_base + 24, "#b5b2b5")
 
-    draw_string_at(canvas_image, spritesheet, "Score: ", 192, 68, "#b5b2b5")
-    draw_string_at(canvas_image, spritesheet, str(blue_score), 248, 68, "#ffffff")
-    draw_string_at(canvas_image, spritesheet, "Score: ", 372, 68, "#b5b2b5")
-    draw_string_at(canvas_image, spritesheet, str(red_score), 428, 68, "#ffffff")
+    draw_string_at(canvas_image, spritesheet, "Score: ", 192, 68 + y_offset, "#b5b2b5")
+    draw_string_at(canvas_image, spritesheet, str(blue_score), 248, 68 + y_offset, "#ffffff")
+    draw_string_at(canvas_image, spritesheet, "Score: ", 372, 68 + y_offset, "#b5b2b5")
+    draw_string_at(canvas_image, spritesheet, str(red_score), 428, 68 + y_offset, "#ffffff")
 
 
-def draw_screenshot_hud(spritesheet: Image.Image, data: dict, canvas_image: Image.Image) -> None:
+def draw_screenshot_hud(spritesheet: Image.Image, data: dict, canvas_image: Image.Image, y_offset: int = 0) -> None:
     # Prefer flags loaded from PAKs; no-op if not available
     if FLAG_IMG_BLUE and FLAG_IMG_RED:
-        canvas_image.paste(FLAG_IMG_BLUE, (160, 55), FLAG_IMG_BLUE)
-        canvas_image.paste(FLAG_IMG_RED, (340, 55), FLAG_IMG_RED)
+        canvas_image.paste(FLAG_IMG_BLUE, (160, 55 + y_offset), FLAG_IMG_BLUE)
+        canvas_image.paste(FLAG_IMG_RED, (340, 55 + y_offset), FLAG_IMG_RED)
     else:
         # Fallback to asset images if provided
         try:
             asset_dir = os.path.join(os.path.dirname(__file__), "assets")
             blueflag_img = Image.open(os.path.join(asset_dir, "blueflag.png")).convert("RGBA")
             redflag_img = Image.open(os.path.join(asset_dir, "redflag.png")).convert("RGBA")
-            canvas_image.paste(blueflag_img, (160, 55), blueflag_img)
-            canvas_image.paste(redflag_img, (340, 55), redflag_img)
+            canvas_image.paste(blueflag_img, (160, 55 + y_offset), blueflag_img)
+            canvas_image.paste(redflag_img, (340, 55 + y_offset), redflag_img)
         except FileNotFoundError:
             # If neither PAK nor assets provide flags, continue without them
             logger.info("Flag HUD images not available; continuing without them")
@@ -262,11 +262,11 @@ def draw_screenshot_hud(spritesheet: Image.Image, data: dict, canvas_image: Imag
     server_info = data.get("server", {})
     blue_caps = server_info.get("num_flags_blue", 0)
     red_caps = server_info.get("num_flags_red", 0)
-    draw_string_at(canvas_image, spritesheet, "Flag Captures: ", 192, 78, "#b5b2b5")
-    draw_string_at(canvas_image, spritesheet, str(blue_caps), 312, 78, "#ffffff")
-    draw_string_at(canvas_image, spritesheet, "Flag Captures: ", 372, 78, "#b5b2b5")
-    draw_string_at(canvas_image, spritesheet, str(red_caps), 492, 78, "#ffffff")
-    draw_players(data, canvas_image, spritesheet)
+    draw_string_at(canvas_image, spritesheet, "Flag Captures: ", 192, 78 + y_offset, "#b5b2b5")
+    draw_string_at(canvas_image, spritesheet, str(blue_caps), 312, 78 + y_offset, "#ffffff")
+    draw_string_at(canvas_image, spritesheet, "Flag Captures: ", 372, 78 + y_offset, "#b5b2b5")
+    draw_string_at(canvas_image, spritesheet, str(red_caps), 492, 78 + y_offset, "#ffffff")
+    draw_players(data, canvas_image, spritesheet, y_offset)
 
 
 def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) -> str | None:
@@ -347,6 +347,7 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
     red_count = sum(1 for p in active_players if p.get("team") == 2)
     total_players = len(active_players)
     max_col_players = max(blue_count, red_count)
+    #32 px margin below
     overlay_base_y = max_col_players * 32 + 150
     # Include bottom padding (+8) consistent with postprocess
     intended_bottom = overlay_base_y + 16 + (total_players * 8) + 8
@@ -379,7 +380,8 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
 
     # Draw HUD/text/portraits on a transparent foreground and composite over darkened/background-filled base
     foreground_layer = Image.new("RGBA", base_bg.size, (0, 0, 0, 0))
-    draw_screenshot_hud(spritesheet, data, foreground_layer)
+    # Shift entire HUD down by 8 px to guarantee 8 px spacing from top info rows
+    draw_screenshot_hud(spritesheet, data, foreground_layer, y_offset=8)
     final_composite = Image.alpha_composite(base_bg.convert("RGBA"), foreground_layer)
 
     try:
@@ -447,7 +449,15 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     # Compute baseline Y for overlay and bottom crop per request
     overlay_base_y = max_col_players * 32 + 150
     # Add 8px padding below the last stats row and shift scoreboard down by 8px
-    crop_bottom = overlay_base_y + 32 + (total_players * 8)
+    crop_bottom = overlay_base_y + 32 + (total_players * 8) + 8
+    # Ensure we have enough canvas height BEFORE drawing rows, or drawing would be clipped
+    if crop_bottom > base_img.height:
+        try:
+            extended = Image.new("RGBA", (base_img.width, crop_bottom), (0, 0, 0, 220))
+            extended.paste(base_img, (0, 0))
+            base_img = extended
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to extend canvas prior to drawing: %s", exc)
 
     # Draw top info rows (all left-aligned):
     # Row 1 at y=32 (lands at 0..8 after crop): Time
@@ -544,7 +554,16 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     left = CROP_LEFT
     top = 32
     right = max(left + 1, width - CROP_RIGHT_MARGIN)
-    bottom = min(height, max(top + 1, crop_bottom))
+    # Ensure we do not cut off the statistics table; extend canvas if needed
+    if crop_bottom > height:
+        try:
+            extended = Image.new("RGBA", (width, crop_bottom), (0, 0, 0, 220))
+            extended.paste(base_img, (0, 0))
+            base_img = extended
+            height = base_img.height
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to extend canvas for stats: %s", exc)
+    bottom = max(top + 1, crop_bottom)
     try:
         cropped = base_img.crop((left, top, right, bottom))
     except Exception as exc:  # noqa: BLE001
