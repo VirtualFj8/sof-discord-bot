@@ -20,6 +20,12 @@ SPRITESHEET_CONCHARS: Optional[Image.Image] = None
 FLAG_IMG_RED: Optional[Image.Image] = None
 FLAG_IMG_BLUE: Optional[Image.Image] = None
 
+# Horizontal crop configuration (left pixels cropped off, and right margin kept)
+# To widen the visible area by 32px on each side, reduce left crop by 32 and reduce right margin by 32.
+# Original: left=128, right_margin=108 → Wider: left=96, right_margin=76
+CROP_LEFT = 96
+CROP_RIGHT_MARGIN = 76
+
 COLOR_ARRAY = [
     "#ffffff", "#FFFFFF", "#FF0000", "#00FF00", "#ffff00", "#0000ff", "#ff00ff",
     "#00ffff", "#000000", "#7f7f7f", "#ffffff", "#7f0000", "#007f00", "#ffffff",
@@ -334,8 +340,8 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
     overlay_base_y = max_col_players * 32 + 150
     # Include bottom padding (+8) consistent with postprocess
     intended_bottom = overlay_base_y + 16 + (total_players * 8) + 8
-    target_left, target_top = 128, 32
-    target_right = 640 - 108
+    target_left, target_top = CROP_LEFT, 32
+    target_right = 640 - CROP_RIGHT_MARGIN
     target_bottom = min(480, max(target_top + 1, intended_bottom))
     region_w = max(1, target_right - target_left)
     region_h = max(1, target_bottom - target_top)
@@ -442,8 +448,8 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     hostname = str(server_info.get("hostname", "unknown host")) or "unknown host"
     utc_now = datetime.utcnow().strftime("%d/%m/%y %H:%M utc")
     width, height = base_img.size
-    crop_left = 128
-    crop_right = max(crop_left + 1, width - 108)
+    crop_left = CROP_LEFT
+    crop_right = max(crop_left + 1, width - CROP_RIGHT_MARGIN)
     # Row 1: time left
     draw_string_at(base_img, spritesheet, utc_now, crop_left, 32, "#ffffff")
     # Row 2: hostname left with inline colors (no override)
@@ -455,7 +461,7 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     header1 = " # CC FPS Ping Score PPM FRG DIE SK FLG REC Name"
     header2 = "-- -- --- ---- ----- --- --- --- -- --- --- ---------------"
     # Place within the area that will remain after left crop (x=128)
-    overlay_x = 128
+    overlay_x = CROP_LEFT
     draw_string_at(base_img, spritesheet, header1, overlay_x, overlay_base_y + 0, "#ffffff")
     draw_string_at(base_img, spritesheet, header2, overlay_x, overlay_base_y + 8, "#b5b2b5")
 
@@ -517,9 +523,9 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
 
     # Perform crop
     width, height = base_img.size
-    left = 128
+    left = CROP_LEFT
     top = 32
-    right = max(left + 1, width - 108)
+    right = max(left + 1, width - CROP_RIGHT_MARGIN)
     bottom = min(height, max(top + 1, crop_bottom))
     try:
         cropped = base_img.crop((left, top, right, bottom))
