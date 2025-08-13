@@ -63,8 +63,16 @@ Run the watcher from repo root:
 
 ```bash
 source sof-discord-venv/bin/activate  # Linux/macOS
-python -m sof_discord_bot.cli
-# Or with the console script if installed: sof-discord-bot
+
+# Method 1 (recommended): install package and run console script
+pip install -e .
+sof-discord-bot
+
+# Method 2: run as module with src-layout
+PYTHONPATH=src python3 -m sof_discord_bot.cli
+
+# Method 3: use helper launcher (adds src to sys.path)
+python3 run.py
 ```
 
 ### Option B: Install as a package
@@ -131,13 +139,14 @@ Below is a minimal service template. Adjust paths and user/group.
 sudo useradd --system --create-home --shell /usr/sbin/nologin sofbot || true
 ```
 
-2) Place the repo and create a venv as that user:
+2) Place the repo and create a venv as that user, then install the package into the venv:
 ```bash
 sudo mkdir -p /opt/sof-discord-bot
 sudo chown -R sofbot:sofbot /opt/sof-discord-bot
 sudo -u sofbot git clone <this-repo> /opt/sof-discord-bot
 cd /opt/sof-discord-bot
 sudo -u sofbot -H bash -lc 'cd /opt/sof-discord-bot && ./setup_env.sh'
+sudo -u sofbot -H bash -lc 'source /opt/sof-discord-bot/sof-discord-venv/bin/activate && pip install -e .'
 ```
 
 3) Configure environment:
@@ -146,7 +155,7 @@ sudo cp systemd/sof-discord-bot.env.example /etc/default/sof-discord-bot
 sudo nano /etc/default/sof-discord-bot  # set DISCORD_WEBHOOK_URL, SOF_BOT_LOG
 ```
 
-4) Install the service unit:
+4) Install the service unit (uses the console script installed above):
 ```bash
 sudo cp systemd/sof-discord-bot.service /etc/systemd/system/sof-discord-bot.service
 sudo nano /etc/systemd/system/sof-discord-bot.service  # adjust WorkingDirectory and venv path if needed
@@ -154,6 +163,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable sof-discord-bot
 sudo systemctl start sof-discord-bot
 ```
+
+Alternative service (without installing the package):
+- Set `Environment=PYTHONPATH=/opt/sof-discord-bot/src` and use `ExecStart=/opt/sof-discord-bot/sof-discord-venv/bin/python -m sof_discord_bot.cli` in the unit file.
 
 5) Manage the service:
 ```bash
