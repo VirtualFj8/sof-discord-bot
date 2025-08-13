@@ -43,16 +43,25 @@ function .wantplay(~slot, *)
 {
   sp_sc_func_exec info_client
   sp_sc_func_exec info_server ".wantplay" $~slot
+
+  sp_sv_print_client #~slot " OK."
+  sp_sv_print_client #~slot " The message has been sent to  Discord."
 }
 
 function .match1(~slot, *)
 {
   sp_sc_func_exec info_client
   sp_sc_func_exec info_server ".match1" $~slot
+
+  sp_sv_print_client #~slot " OK."
+  sp_sv_print_client #~slot " The message has been sent to  Discord."
 }
 
-function match2(~slot, *)
+function .match2(~slot, *)
 {
   sp_sc_func_exec info_client
   sp_sc_func_exec info_server ".match2" $~slot
+
+  sp_sv_print_client #~slot " OK."
+  sp_sv_print_client #~slot " The message has been sent to  Discord."
 }
