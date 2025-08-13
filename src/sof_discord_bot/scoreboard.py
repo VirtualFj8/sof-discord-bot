@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 
 import requests
 from PIL import Image
+from datetime import datetime
 
 from .vendor.pak import unpack_one_to_memory
 from .logging_utils import get_logger
@@ -175,6 +176,12 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
     for player_data in list(data.get("players", [])):
         if player_data is None:
             continue
+        # Skip spectators
+        try:
+            if int(player_data.get("spectator", 0) or 0) != 0:
+                continue
+        except Exception:
+            pass
         if isinstance(player_data.get("name"), str):
             player_data["name"] = _decode_player_name(player_data["name"]) 
         if player_data.get("team") == 1:
@@ -299,9 +306,20 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
 
     # Compute target cropped region geometry to fit the background within
     players_list = list(data.get("players", []))
-    blue_count = sum(1 for p in players_list if p and p.get("team") == 1)
-    red_count = sum(1 for p in players_list if p and p.get("team") == 2)
-    total_players = sum(1 for p in players_list if p)
+    # Only count non-spectators when sizing the cropped region
+    active_players: list[dict] = []
+    for p in players_list:
+        if not p:
+            continue
+        try:
+            if int(p.get("spectator", 0) or 0) != 0:
+                continue
+        except Exception:
+            pass
+        active_players.append(p)
+    blue_count = sum(1 for p in active_players if p.get("team") == 1)
+    red_count = sum(1 for p in active_players if p.get("team") == 2)
+    total_players = len(active_players)
     max_col_players = max(blue_count, red_count)
     overlay_base_y = max_col_players * 32 + 150
     # Include bottom padding (+8) consistent with postprocess
@@ -362,6 +380,12 @@ def _collect_players_by_team(data: dict) -> tuple[list[tuple[int, dict]], list[t
     for slot, player_data in enumerate(list(data.get("players", []))):
         if player_data is None:
             continue
+        # Skip spectators
+        try:
+            if int(player_data.get("spectator", 0) or 0) != 0:
+                continue
+        except Exception:
+            pass
         # Ensure we only decode once from exporter-provided base64
         if isinstance(player_data.get("name"), str):
             player_data["name"] = _decode_player_name(player_data["name"]) 
@@ -399,17 +423,25 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     # Add 8px padding below the last stats row
     crop_bottom = overlay_base_y + 16 + (total_players * 8) + 8
 
-    # Draw map name at the future top of the cropped image (use top 8 px)
+    # Draw top info rows:
+    # Row 1 at y=32 (lands at 0..8 after crop): Left: UTC time, Right: hostname
+    # Row 2 at y=40 (lands at 8..16 after crop): Centered map name
     server_info = data.get("server", {})
-    map_full_name = str(server_info.get("map_current", "unknown"))
-    map_display = map_full_name if map_full_name else "unknown"
+    map_display = str(server_info.get("map_current", "unknown")) or "unknown"
+    hostname = str(server_info.get("hostname", "unknown host")) or "unknown host"
+    utc_now = datetime.utcnow().strftime("UTC %d/%m/%y %H:%M")
     width, height = base_img.size
     crop_left = 128
     crop_right = max(crop_left + 1, width - 108)
-    map_text_width = len(map_display) * 8
-    map_x = crop_left + max(0, (crop_right - crop_left - map_text_width) // 2)
-    # Place at y=32 so that after top crop (32px) it sits at the very top (0..8px) of the final image
-    draw_string_at(base_img, spritesheet, map_display, map_x, 32, "#ffffff")
+    # Row 1: time (left) and hostname (right)
+    draw_string_at(base_img, spritesheet, utc_now, crop_left, 32, "#ffffff")
+    host_w = len(hostname) * 8
+    right_x = max(crop_left, crop_right - host_w)
+    draw_string_at(base_img, spritesheet, hostname, right_x, 32, "#ffffff")
+    # Row 2: centered map name (8 px lower)
+    center_text_w = len(map_display) * 8
+    center_x = crop_left + max(0, ((crop_right - crop_left) - center_text_w) // 2)
+    draw_string_at(base_img, spritesheet, map_display, center_x, 40, "#ffffff")
 
     # Draw header and rows
     header1 = " # CC FPS Ping Score PPM FRG DIE SK FLG REC Name"

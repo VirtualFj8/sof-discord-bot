@@ -36,7 +36,7 @@ function info_client( )
 
 function info_server(~discord_mode, ~discord_slot, ~discord_msg)
 {
-  sp_sc_cvar_save info_server/server.cfg _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot ~discord_msg
+  sp_sc_cvar_save info_server/server.cfg hostname _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot ~discord_msg
 }
 
 function .wantplay(~slot, *)
