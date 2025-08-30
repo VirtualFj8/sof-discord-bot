@@ -256,6 +256,14 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
                 brightness_factor = 1.0 + ((0.5 - luminance) * scale)
                 region = ImageEnhance.Brightness(region).enhance(brightness_factor)
                 region = ImageEnhance.Contrast(region).enhance(contrast_factor)
+                # Slightly whiten very dark backgrounds to help black/grey text stand out
+                if bg_lum < 0.30:
+                    try:
+                        alpha_val = 56 if bg_lum < 0.15 else 32
+                        white_overlay = Image.new("RGBA", (8, 8), (255, 255, 255, alpha_val))
+                        region = Image.alpha_composite(region.convert("RGBA"), white_overlay)
+                    except Exception:
+                        pass
                 canvas_image.paste(region, (ox, oy))
             except Exception:
                 pass
