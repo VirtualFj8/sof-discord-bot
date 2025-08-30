@@ -5,7 +5,7 @@ from io import BytesIO
 from typing import Dict, List, Optional
 
 import requests
-from PIL import Image, ImageDraw
+from PIL import Image, ImageEnhance
 from datetime import datetime
 
 from .vendor.pak import unpack_one_to_memory
@@ -215,65 +215,35 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
         y_clip = (char_code // 16) * 8
         if x_clip + 8 <= spritesheet.width and y_clip + 8 <= spritesheet.height:
             char_sprite = spritesheet.crop((x_clip, y_clip, x_clip + 8, y_clip + 8))
+            ox = xpos + x_offset
+            oy = ypos
+            # Adjust background under this glyph to improve contrast relative to text luminance
+            try:
+                c = final_color.lstrip('#')
+                r = int(c[0:2], 16)
+                g = int(c[2:4], 16)
+                b = int(c[4:6], 16)
+                luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+            except Exception:
+                luminance = 1.0
+            try:
+                region = canvas_image.crop((ox, oy, ox + 8, oy + 8))
+                # Shift brightness away from the text luminance and slightly boost contrast
+                brightness_factor = 1.0 + ((0.5 - luminance) * 0.24)
+                region = ImageEnhance.Brightness(region).enhance(brightness_factor)
+                region = ImageEnhance.Contrast(region).enhance(1.15)
+                canvas_image.paste(region, (ox, oy))
+            except Exception:
+                pass
+            # Draw the glyph
             color_image = Image.new("RGBA", (8, 8), final_color)
-            canvas_image.paste(color_image, (xpos + x_offset, ypos), mask=char_sprite)
+            canvas_image.paste(color_image, (ox, oy), mask=char_sprite)
         x_offset += 8
 
 
 def _measure_visible_chars_and_luminance(string: str, color_override: Optional[str] = None) -> tuple[int, float]:
-    """Return (visible_char_count, average_luminance[0..1]).
-
-    Luminance computed from per-glyph color after applying inline color codes.
-    """
-    # Encode to latin-1 bytes like draw_string_at
-    if isinstance(string, (bytes, bytearray)):
-        byte_seq = bytes(string)
-    else:
-        try:
-            byte_seq = str(string).encode("latin-1", errors="replace")
-        except Exception:
-            byte_seq = bytes((ord(ch) % 256 for ch in str(string)))
-
-    current_color = "#00ff00"
-    total_lum = 0.0
-    count = 0
-    for char_code in byte_seq:
-        if char_code < 32:
-            if not color_override and char_code < len(COLOR_ARRAY):
-                current_color = COLOR_ARRAY[char_code]
-            continue
-        final_color = color_override if color_override else current_color
-        try:
-            c = final_color.lstrip('#')
-            r = int(c[0:2], 16)
-            g = int(c[2:4], 16)
-            b = int(c[4:6], 16)
-            lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
-        except Exception:
-            lum = 1.0
-        total_lum += lum
-        count += 1
-    avg_lum = (total_lum / count) if count > 0 else 1.0
-    return count, avg_lum
-
-
-def draw_text_backplate(canvas_image: Image.Image, string: str, xpos: int, ypos: int, color_override: Optional[str] = None) -> None:
-    """Draw a subtle translucent backplate behind the string area for readability.
-
-    Chooses light or dark plate based on average text luminance.
-    """
-    visible_chars, avg_lum = _measure_visible_chars_and_luminance(string, color_override)
-    if visible_chars <= 0:
-        return
-    width_px = visible_chars * 8
-    pad_x = 1
-    # Dark plate for light text; light plate for dark text
-    if avg_lum >= 0.5:
-        plate_color = (0, 0, 0, 72)
-    else:
-        plate_color = (255, 255, 255, 72)
-    draw = ImageDraw.Draw(canvas_image)
-    draw.rectangle([xpos - pad_x, ypos, xpos + width_px + pad_x, ypos + 8], fill=plate_color)
+    # No longer used; kept for potential future tuning. Return zeros.
+    return 0, 0.0
 
 
 def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image, y_offset: int = 0) -> None:
@@ -319,10 +289,11 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
     for i, player in enumerate(blue_players):
         y_base = 120 + (32 * i) + y_offset
         skin = ALL_PORTRAITS.get(player.get("skin", "mullins"))
+        if skin is None:
+            skin = ALL_PORTRAITS.get("mullins")
         if skin is not None:
             canvas_image.paste(skin, (160, y_base), skin)
         name_to_draw = player.get("_decoded_name") or _decode_player_name(player.get("name", ""))
-        draw_text_backplate(canvas_image, name_to_draw, 192, y_base)
         draw_string_at(canvas_image, spritesheet, name_to_draw, 192, y_base)
         draw_string_at(canvas_image, spritesheet, "Score:  ", 192, y_base + 8, "#b5b2b5")
         draw_string_at(canvas_image, spritesheet, str(player.get("score", 0)), 256, y_base + 8, "#ffffff")
@@ -334,11 +305,12 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
     for i, player in enumerate(red_players):
         y_base = 120 + (32 * i) + y_offset
         skin = ALL_PORTRAITS.get(player.get("skin", "mullins"))
+        if skin is None:
+            skin = ALL_PORTRAITS.get("mullins")
         if skin is not None:
             # Place red team portraits at the right column (aligned with text at x=372)
             canvas_image.paste(skin, (340, y_base), skin)
         name_to_draw = player.get("_decoded_name") or _decode_player_name(player.get("name", ""))
-        draw_text_backplate(canvas_image, name_to_draw, 372, y_base)
         draw_string_at(canvas_image, spritesheet, name_to_draw, 372, y_base)
         draw_string_at(canvas_image, spritesheet, "Score:  ", 372, y_base + 8, "#b5b2b5")
         draw_string_at(canvas_image, spritesheet, str(player.get("score", 0)), 436, y_base + 8, "#ffffff")
@@ -373,13 +345,9 @@ def draw_screenshot_hud(spritesheet: Image.Image, data: dict, canvas_image: Imag
     server_info = data.get("server", {})
     blue_caps = server_info.get("num_flags_blue", 0)
     red_caps = server_info.get("num_flags_red", 0)
-    draw_text_backplate(canvas_image, "Flag Captures: ", 192, 78 + y_offset, "#b5b2b5")
     draw_string_at(canvas_image, spritesheet, "Flag Captures: ", 192, 78 + y_offset, "#b5b2b5")
-    draw_text_backplate(canvas_image, str(blue_caps), 312, 78 + y_offset, "#ffffff")
     draw_string_at(canvas_image, spritesheet, str(blue_caps), 312, 78 + y_offset, "#ffffff")
-    draw_text_backplate(canvas_image, "Flag Captures: ", 372, 78 + y_offset, "#b5b2b5")
     draw_string_at(canvas_image, spritesheet, "Flag Captures: ", 372, 78 + y_offset, "#b5b2b5")
-    draw_text_backplate(canvas_image, str(red_caps), 492, 78 + y_offset, "#ffffff")
     draw_string_at(canvas_image, spritesheet, str(red_caps), 492, 78 + y_offset, "#ffffff")
     draw_players(data, canvas_image, spritesheet, y_offset)
 
@@ -495,11 +463,10 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
         except Exception as exc:  # noqa: BLE001
             logger.exception("Failed to scale/paste background: %s", exc)
 
-    # Draw HUD/text/portraits on a transparent foreground and composite over darkened/background-filled base
-    foreground_layer = Image.new("RGBA", base_bg.size, (0, 0, 0, 0))
+    # Draw HUD/text/portraits directly on the base background so local contrast adjustments affect visible pixels
     # Shift entire HUD down by 8 px to guarantee 8 px spacing from top info rows
-    draw_screenshot_hud(spritesheet, data, foreground_layer, y_offset=8)
-    final_composite = Image.alpha_composite(base_bg.convert("RGBA"), foreground_layer)
+    draw_screenshot_hud(spritesheet, data, base_bg, y_offset=8)
+    final_composite = base_bg
 
     try:
         final_path = os.path.expanduser(output_path)
@@ -603,13 +570,10 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     crop_left = CROP_LEFT
     crop_right = max(crop_left + 1, width - CROP_RIGHT_MARGIN)
     # Row 1: time left (shifted down by 8px to provide top padding after crop)
-    draw_text_backplate(base_img, utc_now, crop_left, 40, "#ffffff")
     draw_string_at(base_img, spritesheet, utc_now, crop_left, 40, "#ffffff")
     # Row 2: hostname left with inline colors (no override)
-    draw_text_backplate(base_img, hostname, crop_left, 48)
     draw_string_at(base_img, spritesheet, hostname, crop_left, 48)
     # Row 3: map name left
-    draw_text_backplate(base_img, map_display, crop_left, 56, "#ffffff")
     draw_string_at(base_img, spritesheet, map_display, crop_left, 56, "#ffffff")
 
     # Draw header and rows
@@ -617,9 +581,7 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     header2 = "-- -- --- ---- ----- --- --- --- -- --- --- ---------------"
     # Place within the area that will remain after left crop (x=128)
     overlay_x = CROP_LEFT
-    draw_text_backplate(base_img, header1, overlay_x, overlay_base_y + 8, "#ffffff")
     draw_string_at(base_img, spritesheet, header1, overlay_x, overlay_base_y + 8, "#ffffff")
-    draw_text_backplate(base_img, header2, overlay_x, overlay_base_y + 16, "#b5b2b5")
     draw_string_at(base_img, spritesheet, header2, overlay_x, overlay_base_y + 16, "#b5b2b5")
 
     # Build a flat ordered list of players sorted solely by slot id
@@ -674,7 +636,6 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
             f" {flags_recovered:>3} "
         )
         x_after_slot = overlay_x + (len(slot_text) * 8)
-        draw_text_backplate(base_img, columns_text, x_after_slot, row_y, "#ffffff")
         draw_string_at(base_img, spritesheet, columns_text, x_after_slot, row_y, "#ffffff")
 
         x_before_name = x_after_slot + (len(columns_text) * 8)
@@ -684,10 +645,8 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
         except Exception:
             has_inline_color = False
         if has_inline_color:
-            draw_text_backplate(base_img, name, x_before_name, row_y)
             draw_string_at(base_img, spritesheet, name, x_before_name, row_y)
         else:
-            draw_text_backplate(base_img, name, x_before_name, row_y, "#ffffff")
             draw_string_at(base_img, spritesheet, name, x_before_name, row_y, "#ffffff")
 
     # Perform crop
