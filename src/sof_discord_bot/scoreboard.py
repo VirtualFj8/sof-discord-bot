@@ -168,8 +168,17 @@ def load_flags_from_paks(sof_dir: str) -> tuple[Optional[Image.Image], Optional[
 def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: str, xpos: int, ypos: int, color_override: Optional[str] = None) -> None:
     x_offset = 0
     current_color = "#00ff00"
-    for char in str(string):
-        char_code = ord(char)
+    # Encode to latin-1 bytes so we map exactly to the 0-255 spritesheet indices.
+    # Replace characters that cannot be encoded to latin-1 with '?'. This
+    # preserves in-string control bytes (0..31) used for inline color codes.
+    try:
+        byte_seq = str(string).encode("latin-1", errors="replace")
+    except Exception:
+        # Fallback: iterate over the string using ordinal values
+        byte_seq = bytes((ord(ch) % 256 for ch in str(string)))
+
+    for char_code in byte_seq:
+        # char_code is an int 0..255
         if char_code < 32:
             if not color_override and char_code < len(COLOR_ARRAY):
                 current_color = COLOR_ARRAY[char_code]
