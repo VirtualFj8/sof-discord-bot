@@ -5,7 +5,7 @@ from io import BytesIO
 from typing import Dict, List, Optional
 
 import requests
-from PIL import Image
+from PIL import Image, ImageDraw
 from datetime import datetime
 
 from .vendor.pak import unpack_one_to_memory
@@ -54,11 +54,29 @@ def gen_scoreboard_init(sof_dir: str) -> dict[str, Image.Image]:
 def _decode_player_name(value: Optional[str]) -> str:
     if not value:
         return "Unknown"
+    # If bytes were passed in, decode directly
+    if isinstance(value, (bytes, bytearray)):
+        try:
+            return bytes(value).decode("latin-1")
+        except Exception:
+            return "Unknown"
+
+    # Only decode once, and only if input is canonical base64 as produced by our exporter.
+    s: str = value
     try:
-        return base64.b64decode(value).decode("latin-1")
+        # Quick shape checks first
+        b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+        if not s or len(s) % 4 != 0 or any(ch not in b64chars for ch in s):
+            return s
+        decoded_bytes = base64.b64decode(s, validate=True)
+        # Strict round-trip to avoid accidental re-decoding of plain names
+        re_encoded = base64.b64encode(decoded_bytes).decode("ascii").rstrip("=")
+        normalized_orig = s.strip().rstrip("=")
+        if re_encoded == normalized_orig:
+            return decoded_bytes.decode("latin-1", errors="replace")
+        return s
     except Exception:
-        # If it's already decoded or not valid base64, return as-is
-        return value
+        return s
 
 
 def _has_effective_inline_color(value: str) -> bool:
@@ -168,20 +186,29 @@ def load_flags_from_paks(sof_dir: str) -> tuple[Optional[Image.Image], Optional[
 def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: str, xpos: int, ypos: int, color_override: Optional[str] = None) -> None:
     x_offset = 0
     current_color = "#00ff00"
-    # Encode to latin-1 bytes so we map exactly to the 0-255 spritesheet indices.
-    # Replace characters that cannot be encoded to latin-1 with '?'. This
-    # preserves in-string control bytes (0..31) used for inline color codes.
-    try:
-        byte_seq = str(string).encode("latin-1", errors="replace")
-    except Exception:
-        # Fallback: iterate over the string using ordinal values
-        byte_seq = bytes((ord(ch) % 256 for ch in str(string)))
+    # Accept bytes/bytearray directly to avoid rendering the Python repr (e.g. "b'...'"),
+    # which would expose escape sequences as visible characters. Otherwise encode the
+    # provided string to latin-1 bytes so we map exactly to the 0-255 spritesheet indices.
+    if isinstance(string, (bytes, bytearray)):
+        byte_seq = bytes(string)
+    else:
+        try:
+            byte_seq = str(string).encode("latin-1", errors="replace")
+        except Exception:
+            byte_seq = bytes((ord(ch) % 256 for ch in str(string)))
 
     for char_code in byte_seq:
         # char_code is an int 0..255
         if char_code < 32:
-            if not color_override and char_code < len(COLOR_ARRAY):
-                current_color = COLOR_ARRAY[char_code]
+            # Log color-code application for debugging problematic names
+            try:
+                if not color_override and char_code < len(COLOR_ARRAY):
+                    logger.debug("draw_string_at: applying color code %d -> %s for string=%r", char_code, COLOR_ARRAY[char_code], string)
+                    current_color = COLOR_ARRAY[char_code]
+                else:
+                    logger.debug("draw_string_at: encountered control byte %d but color override present or out of range for string=%r", char_code, string)
+            except Exception:
+                pass
             continue
         final_color = color_override if color_override else current_color
         x_clip = (char_code % 16) * 8
@@ -191,6 +218,62 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
             color_image = Image.new("RGBA", (8, 8), final_color)
             canvas_image.paste(color_image, (xpos + x_offset, ypos), mask=char_sprite)
         x_offset += 8
+
+
+def _measure_visible_chars_and_luminance(string: str, color_override: Optional[str] = None) -> tuple[int, float]:
+    """Return (visible_char_count, average_luminance[0..1]).
+
+    Luminance computed from per-glyph color after applying inline color codes.
+    """
+    # Encode to latin-1 bytes like draw_string_at
+    if isinstance(string, (bytes, bytearray)):
+        byte_seq = bytes(string)
+    else:
+        try:
+            byte_seq = str(string).encode("latin-1", errors="replace")
+        except Exception:
+            byte_seq = bytes((ord(ch) % 256 for ch in str(string)))
+
+    current_color = "#00ff00"
+    total_lum = 0.0
+    count = 0
+    for char_code in byte_seq:
+        if char_code < 32:
+            if not color_override and char_code < len(COLOR_ARRAY):
+                current_color = COLOR_ARRAY[char_code]
+            continue
+        final_color = color_override if color_override else current_color
+        try:
+            c = final_color.lstrip('#')
+            r = int(c[0:2], 16)
+            g = int(c[2:4], 16)
+            b = int(c[4:6], 16)
+            lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+        except Exception:
+            lum = 1.0
+        total_lum += lum
+        count += 1
+    avg_lum = (total_lum / count) if count > 0 else 1.0
+    return count, avg_lum
+
+
+def draw_text_backplate(canvas_image: Image.Image, string: str, xpos: int, ypos: int, color_override: Optional[str] = None) -> None:
+    """Draw a subtle translucent backplate behind the string area for readability.
+
+    Chooses light or dark plate based on average text luminance.
+    """
+    visible_chars, avg_lum = _measure_visible_chars_and_luminance(string, color_override)
+    if visible_chars <= 0:
+        return
+    width_px = visible_chars * 8
+    pad_x = 1
+    # Dark plate for light text; light plate for dark text
+    if avg_lum >= 0.5:
+        plate_color = (0, 0, 0, 72)
+    else:
+        plate_color = (255, 255, 255, 72)
+    draw = ImageDraw.Draw(canvas_image)
+    draw.rectangle([xpos - pad_x, ypos, xpos + width_px + pad_x, ypos + 8], fill=plate_color)
 
 
 def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image, y_offset: int = 0) -> None:
@@ -207,8 +290,23 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
                 continue
         except Exception:
             pass
-        if isinstance(player_data.get("name"), str):
-            player_data["name"] = _decode_player_name(player_data["name"]) 
+        if isinstance(player_data.get("name"), str) and "_decoded_name" not in player_data:
+            # Decode from exporter-provided base64 but do not mutate original field
+            original = player_data.get("name")
+            decoded_name = _decode_player_name(original)
+            player_data["_decoded_name"] = decoded_name
+            # Log suspicious names that contain non-ASCII or control bytes for debugging
+            try:
+                name_check = decoded_name
+                if any(ord(ch) < 32 or ord(ch) > 127 for ch in name_check):
+                    logger.debug(
+                        "Suspicious player name decoded in draw_players: original=%r decoded=%r bytes=%s",
+                        original,
+                        name_check,
+                        list(name_check.encode("latin-1", errors="replace")),
+                    )
+            except Exception:
+                pass
         if player_data.get("team") == 1:
             blue_players.append(player_data)
             blue_score += int(player_data.get("score", 0))
@@ -223,7 +321,9 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
         skin = ALL_PORTRAITS.get(player.get("skin", "mullins"))
         if skin is not None:
             canvas_image.paste(skin, (160, y_base), skin)
-        draw_string_at(canvas_image, spritesheet, player["name"], 192, y_base)
+        name_to_draw = player.get("_decoded_name") or _decode_player_name(player.get("name", ""))
+        draw_text_backplate(canvas_image, name_to_draw, 192, y_base)
+        draw_string_at(canvas_image, spritesheet, name_to_draw, 192, y_base)
         draw_string_at(canvas_image, spritesheet, "Score:  ", 192, y_base + 8, "#b5b2b5")
         draw_string_at(canvas_image, spritesheet, str(player.get("score", 0)), 256, y_base + 8, "#ffffff")
         draw_string_at(canvas_image, spritesheet, f"Ping:   {player.get('ping', 'N/A')}", 192, y_base + 16, "#b5b2b5")
@@ -237,7 +337,9 @@ def draw_players(data: dict, canvas_image: Image.Image, spritesheet: Image.Image
         if skin is not None:
             # Place red team portraits at the right column (aligned with text at x=372)
             canvas_image.paste(skin, (340, y_base), skin)
-        draw_string_at(canvas_image, spritesheet, player["name"], 372, y_base)
+        name_to_draw = player.get("_decoded_name") or _decode_player_name(player.get("name", ""))
+        draw_text_backplate(canvas_image, name_to_draw, 372, y_base)
+        draw_string_at(canvas_image, spritesheet, name_to_draw, 372, y_base)
         draw_string_at(canvas_image, spritesheet, "Score:  ", 372, y_base + 8, "#b5b2b5")
         draw_string_at(canvas_image, spritesheet, str(player.get("score", 0)), 436, y_base + 8, "#ffffff")
         draw_string_at(canvas_image, spritesheet, f"Ping:   {player.get('ping', 'N/A')}", 372, y_base + 16, "#b5b2b5")
@@ -271,9 +373,13 @@ def draw_screenshot_hud(spritesheet: Image.Image, data: dict, canvas_image: Imag
     server_info = data.get("server", {})
     blue_caps = server_info.get("num_flags_blue", 0)
     red_caps = server_info.get("num_flags_red", 0)
+    draw_text_backplate(canvas_image, "Flag Captures: ", 192, 78 + y_offset, "#b5b2b5")
     draw_string_at(canvas_image, spritesheet, "Flag Captures: ", 192, 78 + y_offset, "#b5b2b5")
+    draw_text_backplate(canvas_image, str(blue_caps), 312, 78 + y_offset, "#ffffff")
     draw_string_at(canvas_image, spritesheet, str(blue_caps), 312, 78 + y_offset, "#ffffff")
+    draw_text_backplate(canvas_image, "Flag Captures: ", 372, 78 + y_offset, "#b5b2b5")
     draw_string_at(canvas_image, spritesheet, "Flag Captures: ", 372, 78 + y_offset, "#b5b2b5")
+    draw_text_backplate(canvas_image, str(red_caps), 492, 78 + y_offset, "#ffffff")
     draw_string_at(canvas_image, spritesheet, str(red_caps), 492, 78 + y_offset, "#ffffff")
     draw_players(data, canvas_image, spritesheet, y_offset)
 
@@ -337,7 +443,8 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
                 logger.warning("No background found for map %s", map_full_name)
 
     # Prepare a smoky black base (background fill outside map area)
-    base_bg = Image.new("RGBA", (640, 480), (0, 0, 0, 220))
+    # Slightly brighter base background to improve readability of dark names
+    base_bg = Image.new("RGBA", (640, 480), (16, 16, 16, 220))
 
     # Compute target cropped region geometry to fit the background within
     players_list = list(data.get("players", []))
@@ -378,7 +485,8 @@ def generate_screenshot_for_port(port: str, sofplus_data_path: str, data: dict) 
                 resample = Image.BICUBIC
             map_scaled = canvas_image.resize((scaled_w, scaled_h), resample=resample)
             # Darken only the map image
-            overlay = Image.new("RGBA", map_scaled.size, (0, 0, 0, 128))
+            # Subtle brightness lift: reduce darkening to make white/black names readable
+            overlay = Image.new("RGBA", map_scaled.size, (0, 0, 0, 96))
             map_dark = Image.alpha_composite(map_scaled.convert("RGBA"), overlay)
             # Center within target region
             paste_x = target_left + (region_w - scaled_w) // 2
@@ -423,9 +531,23 @@ def _collect_players_by_team(data: dict) -> tuple[list[tuple[int, dict]], list[t
                 continue
         except Exception:
             pass
-        # Ensure we only decode once from exporter-provided base64
-        if isinstance(player_data.get("name"), str):
-            player_data["name"] = _decode_player_name(player_data["name"]) 
+        # Decode from exporter-provided base64 but do not mutate original field
+        if isinstance(player_data.get("name"), str) and "_decoded_name" not in player_data:
+            original = player_data.get("name")
+            decoded_name = _decode_player_name(original)
+            player_data["_decoded_name"] = decoded_name
+            try:
+                name_check = decoded_name
+                if any(ord(ch) < 32 or ord(ch) > 127 for ch in name_check):
+                    logger.debug(
+                        "Suspicious player name in slot %s: original=%r decoded=%r bytes=%s",
+                        slot,
+                        original,
+                        name_check,
+                        list(name_check.encode("latin-1", errors="replace")),
+                    )
+            except Exception:
+                pass
         team_val = player_data.get("team")
         if team_val == 1:
             blue_players.append((slot, player_data))
@@ -462,7 +584,8 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     # Ensure we have enough canvas height BEFORE drawing rows, or drawing would be clipped
     if crop_bottom > base_img.height:
         try:
-            extended = Image.new("RGBA", (base_img.width, crop_bottom), (0, 0, 0, 220))
+            # Slightly brighter extension area to match main base background
+            extended = Image.new("RGBA", (base_img.width, crop_bottom), (16, 16, 16, 220))
             extended.paste(base_img, (0, 0))
             base_img = extended
         except Exception as exc:  # noqa: BLE001
@@ -480,10 +603,13 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     crop_left = CROP_LEFT
     crop_right = max(crop_left + 1, width - CROP_RIGHT_MARGIN)
     # Row 1: time left (shifted down by 8px to provide top padding after crop)
+    draw_text_backplate(base_img, utc_now, crop_left, 40, "#ffffff")
     draw_string_at(base_img, spritesheet, utc_now, crop_left, 40, "#ffffff")
     # Row 2: hostname left with inline colors (no override)
+    draw_text_backplate(base_img, hostname, crop_left, 48)
     draw_string_at(base_img, spritesheet, hostname, crop_left, 48)
     # Row 3: map name left
+    draw_text_backplate(base_img, map_display, crop_left, 56, "#ffffff")
     draw_string_at(base_img, spritesheet, map_display, crop_left, 56, "#ffffff")
 
     # Draw header and rows
@@ -491,7 +617,9 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     header2 = "-- -- --- ---- ----- --- --- --- -- --- --- ---------------"
     # Place within the area that will remain after left crop (x=128)
     overlay_x = CROP_LEFT
+    draw_text_backplate(base_img, header1, overlay_x, overlay_base_y + 8, "#ffffff")
     draw_string_at(base_img, spritesheet, header1, overlay_x, overlay_base_y + 8, "#ffffff")
+    draw_text_backplate(base_img, header2, overlay_x, overlay_base_y + 16, "#b5b2b5")
     draw_string_at(base_img, spritesheet, header2, overlay_x, overlay_base_y + 16, "#b5b2b5")
 
     # Build a flat ordered list of players sorted solely by slot id
@@ -520,7 +648,8 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
                 ppm = 0
         cc = p.get("country", "??")
         fps = p.get("fps", "-")
-        name = p.get("name", "unknown")
+        # Always use single-pass decoded name prepared earlier; fallback to decoding once here
+        name = p.get("_decoded_name") or _decode_player_name(p.get("name", "")) or "unknown"
         team_val = p.get("team", 0)
 
         # Draw slot id in team color, rest of columns white, then name with in-string color codes
@@ -545,6 +674,7 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
             f" {flags_recovered:>3} "
         )
         x_after_slot = overlay_x + (len(slot_text) * 8)
+        draw_text_backplate(base_img, columns_text, x_after_slot, row_y, "#ffffff")
         draw_string_at(base_img, spritesheet, columns_text, x_after_slot, row_y, "#ffffff")
 
         x_before_name = x_after_slot + (len(columns_text) * 8)
@@ -554,8 +684,10 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
         except Exception:
             has_inline_color = False
         if has_inline_color:
+            draw_text_backplate(base_img, name, x_before_name, row_y)
             draw_string_at(base_img, spritesheet, name, x_before_name, row_y)
         else:
+            draw_text_backplate(base_img, name, x_before_name, row_y, "#ffffff")
             draw_string_at(base_img, spritesheet, name, x_before_name, row_y, "#ffffff")
 
     # Perform crop
@@ -566,7 +698,7 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     # Ensure we do not cut off the statistics table; extend canvas if needed
     if crop_bottom > height:
         try:
-            extended = Image.new("RGBA", (width, crop_bottom), (0, 0, 0, 220))
+            extended = Image.new("RGBA", (width, crop_bottom), (16, 16, 16, 220))
             extended.paste(base_img, (0, 0))
             base_img = extended
             height = base_img.height
