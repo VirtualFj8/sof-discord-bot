@@ -228,15 +228,29 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
                 luminance = 1.0
             try:
                 region = canvas_image.crop((ox, oy, ox + 8, oy + 8))
-                # Strengthen adjustment for very dark text to improve readability
+                # Measure background luminance in the 8x8 region (0..1)
+                try:
+                    bg_l = region.convert("L")
+                    bg_vals = list(bg_l.getdata())
+                    bg_lum = (sum(bg_vals) / (len(bg_vals) * 255.0)) if bg_vals else 0.0
+                except Exception:
+                    bg_lum = 0.0
+                # Strengthen adjustment for very dark text and very dark backgrounds
                 base_scale = 0.24
                 contrast_factor = 1.15
-                if luminance < 0.10:
-                    scale = 0.60
-                    contrast_factor = 1.35
-                elif luminance < 0.25:
-                    scale = 0.40
-                    contrast_factor = 1.25
+                if luminance < 0.25:
+                    if bg_lum < 0.15:
+                        scale = 1.00
+                        contrast_factor = 1.60
+                    elif bg_lum < 0.30:
+                        scale = 0.85
+                        contrast_factor = 1.50
+                    elif bg_lum < 0.45:
+                        scale = 0.65
+                        contrast_factor = 1.35
+                    else:
+                        scale = 0.40
+                        contrast_factor = 1.25
                 else:
                     scale = base_scale
                 brightness_factor = 1.0 + ((0.5 - luminance) * scale)
