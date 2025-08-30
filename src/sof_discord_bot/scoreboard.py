@@ -228,10 +228,20 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
                 luminance = 1.0
             try:
                 region = canvas_image.crop((ox, oy, ox + 8, oy + 8))
-                # Shift brightness away from the text luminance and slightly boost contrast
-                brightness_factor = 1.0 + ((0.5 - luminance) * 0.24)
+                # Strengthen adjustment for very dark text to improve readability
+                base_scale = 0.24
+                contrast_factor = 1.15
+                if luminance < 0.10:
+                    scale = 0.60
+                    contrast_factor = 1.35
+                elif luminance < 0.25:
+                    scale = 0.40
+                    contrast_factor = 1.25
+                else:
+                    scale = base_scale
+                brightness_factor = 1.0 + ((0.5 - luminance) * scale)
                 region = ImageEnhance.Brightness(region).enhance(brightness_factor)
-                region = ImageEnhance.Contrast(region).enhance(1.15)
+                region = ImageEnhance.Contrast(region).enhance(contrast_factor)
                 canvas_image.paste(region, (ox, oy))
             except Exception:
                 pass
