@@ -5,7 +5,7 @@ from io import BytesIO
 from typing import Dict, List, Optional
 
 import requests
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageOps
 from datetime import datetime
 
 from .vendor.pak import unpack_one_to_memory
@@ -222,10 +222,13 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
             # New rule: do not alter background unless the active inline color code is between 8 and 30 inclusive
             if not color_override and current_color_code is not None and 8 <= current_color_code <= 30:
                 try:
-                    region = canvas_image.crop((ox, oy, ox + 8, oy + 8))
-                    # Apply a constant white overlay (single shade) under the glyph
+                    region = canvas_image.crop((ox, oy, ox + 8, oy + 8)).convert("RGBA")
+                    # Build a mask that covers background only: invert the glyph's alpha mask
+                    mask = char_sprite.convert("L")
+                    bg_only_mask = ImageOps.invert(mask)
                     white_overlay = Image.new("RGBA", (8, 8), (255, 255, 255, 44))
-                    region = Image.alpha_composite(region.convert("RGBA"), white_overlay)
+                    # Composite white only where glyph is transparent
+                    region = Image.composite(white_overlay, region, bg_only_mask)
                     canvas_image.paste(region, (ox, oy))
                 except Exception:
                     pass
