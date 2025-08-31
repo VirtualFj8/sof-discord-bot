@@ -256,14 +256,25 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
                 brightness_factor = 1.0 + ((0.5 - luminance) * scale)
                 region = ImageEnhance.Brightness(region).enhance(brightness_factor)
                 region = ImageEnhance.Contrast(region).enhance(contrast_factor)
-                # Slightly whiten very dark backgrounds to help black/grey text stand out
-                if bg_lum < 0.30:
-                    try:
-                        alpha_val = 56 if bg_lum < 0.15 else 32
+                # Always apply a subtle white overlay; stronger on darker backgrounds and darker text
+                try:
+                    # weight by text luminance: darker text => stronger overlay
+                    if luminance < 0.25:
+                        text_weight = 1.00
+                    elif luminance < 0.60:
+                        text_weight = 0.75
+                    else:
+                        text_weight = 0.40
+                    # alpha normalized: more overlay when background is dark (1 - bg_lum)
+                    alpha_norm = max(0.0, min(1.0, (1.0 - bg_lum) * text_weight))
+                    min_alpha = 12   # always present but minimal on bright bg
+                    max_alpha = 88   # cap to avoid wash-out
+                    alpha_val = int(min_alpha + alpha_norm * (max_alpha - min_alpha))
+                    if alpha_val > 0:
                         white_overlay = Image.new("RGBA", (8, 8), (255, 255, 255, alpha_val))
                         region = Image.alpha_composite(region.convert("RGBA"), white_overlay)
-                    except Exception:
-                        pass
+                except Exception:
+                    pass
                 canvas_image.paste(region, (ox, oy))
             except Exception:
                 pass
