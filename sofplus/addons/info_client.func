@@ -151,7 +151,7 @@ function .upload_match(~slot, *)
 
     sp_sv_info_client #~slot
   
-    sset ~msg #_sp_sv_info_client_name "%04issued %03.upload_match %04command; this match/map will be uploaded to Discord historic-public-matches channel when it finishes. issue %03.cancel_upload to cancel "
+    sset ~msg #_sp_sv_info_client_name "%04issued %03.upload_match %04command; this match/map will be uploaded to Discord historic-public-matches channel when it finishes. issue %03.cancel_upload %04to cancel "
     sp_sc_cvar_unescape ~msg ~msg
     sp_sv_print_broadcast #~msg
   }
