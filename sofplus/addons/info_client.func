@@ -7,7 +7,8 @@ function info_client_init( )
   //alias !info_client "sp_sc_func_load_file sofplus/addons/info_client.func"
 
   spf_sc_list_add_func _sp_sv_on_map_begin "info_client_map_begin"
-
+  spf_sc_list_add_func _sp_sv_on_map_end "upload_match_on_map_end"
+  
   sp_sc_func_exec info_client_map_begin
 }
 
@@ -16,7 +17,7 @@ function info_client_map_begin()
   set _spf_upload_pending 0
   set _spf_upload_slot -1
 
-  set _spf_upload_hook_added 0
+  
 }
 
 function info_client( )
@@ -138,17 +139,6 @@ function .upload_match(~slot, *)
     set _spf_upload_pending 1
     set _spf_upload_slot #~slot
 
-    // Register the on_map_end callback via list function (register once)
-    sp_sc_flow_if number cvar _spf_upload_hook_added == val 1
-    {
-      // already registered
-    }
-    else
-    {
-      spf_sc_list_add_func _sp_sv_on_map_end "upload_match_on_map_end"
-      set _spf_upload_hook_added 1
-    }
-
     sp_sv_info_client #~slot
   
     sset ~msg #_sp_sv_info_client_name "%04issued %03.upload_match %04command; A screnshot of the scoreboard will be uploaded to Discord %1Fhistoric-public-matches  %04channel when this ends. Issue %03.cancel_upload %04to stop this."
@@ -164,6 +154,11 @@ function upload_match_on_map_end()
   {
     sp_sc_func_exec info_client
     sp_sc_func_exec info_server ".upload_match" _spf_upload_slot ""
+
+    
+    sset ~msg "%04Scoreboard Screenshot uploaded to%1Fhistoric-public-matches %04SoF discord channel. Type %03.discord %04for discord link." 
+    sp_sc_cvar_unescape ~msg ~msg
+    sp_sv_print_broadcast #~msg
 
     // Clear the pending flag
     set _spf_upload_pending 0
@@ -238,4 +233,10 @@ function .want2(~slot, *)
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
+
+function .discord(~slot)
+{
+  set ~msg "%04type %03condump discord %04in console (copy from User/discord.txt). Discord link: https://discord.com/channels/690023187274399779/1405167363531341955"
+  sp_sc_cvar_unescape ~msg ~msg
+  sp_sv_print_broadcast #~msg
 }
