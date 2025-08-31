@@ -233,6 +233,7 @@ function .want2(~slot, *)
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
+}
 
 function .discord(~slot)
 {
