@@ -222,14 +222,18 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
             # New rule: do not alter background unless the active inline color code is between 8 and 30 inclusive
             if not color_override and current_color_code is not None and 8 <= current_color_code <= 30:
                 try:
-                    region = canvas_image.crop((ox, oy, ox + 8, oy + 8)).convert("RGBA")
-                    # Build a mask that covers background only: invert the glyph's alpha mask
-                    mask = char_sprite.convert("L")
-                    bg_only_mask = ImageOps.invert(mask)
-                    white_overlay = Image.new("RGBA", (8, 8), (255, 255, 255, 44))
-                    # Composite white only where glyph is transparent
-                    region = Image.composite(white_overlay, region, bg_only_mask)
-                    canvas_image.paste(region, (ox, oy))
+                    # Build a mask that covers background only: invert the glyph's alpha channel
+                    try:
+                        char_alpha = char_sprite.split()[3]
+                    except Exception:
+                        char_alpha = char_sprite.convert("L")
+                    bg_only_mask = ImageOps.invert(char_alpha)
+                    # Scale mask by desired whiten strength (alpha 44)
+                    strength = 44
+                    whiten_mask = bg_only_mask.point(lambda p: p * strength // 255)
+                    white_overlay = Image.new("RGB", (8, 8), (255, 255, 255))
+                    # Paste white only where background is visible, proportional to mask
+                    canvas_image.paste(white_overlay, (ox, oy), whiten_mask)
                 except Exception:
                     pass
             # Draw the glyph
