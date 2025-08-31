@@ -141,7 +141,7 @@ function .upload_match(~slot, *)
 
     sp_sv_info_client #~slot
   
-    sset ~msg #_sp_sv_info_client_name "%04issued %03.upload_match %04command; A screnshot of the scoreboard will be uploaded to Discord %1Fhistoric-public-matches %04channel when this ends. Issue %03.cancel_upload %04to stop this."
+    sset ~msg #_sp_sv_info_client_name "%04issued %03.upload_match %04command; A screenshot of the scoreboard will be uploaded to Discord %1Fhistoric-public-matches %04channel when this ends. Issue %03.cancel_upload %04to stop this."
     sp_sc_cvar_unescape ~msg ~msg
     sp_sv_print_broadcast #~msg
   }
