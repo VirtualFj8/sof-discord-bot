@@ -229,7 +229,7 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
                         char_alpha = char_sprite.convert("L")
                     bg_only_mask = ImageOps.invert(char_alpha)
                     # Scale mask by desired whiten strength (alpha 44)
-                    strength = 44
+                    strength = 100
                     whiten_mask = bg_only_mask.point(lambda p: p * strength // 255)
                     white_overlay = Image.new("RGB", (8, 8), (255, 255, 255))
                     # Paste white only where background is visible, proportional to mask
