@@ -674,6 +674,7 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
     # Save alongside original
     new_path = os.path.join(os.path.dirname(image_path), "ss_upload.png")
     try:
+        cropped = cropped.resize((cropped.width * 2, cropped.height * 2), resample=Image.LANCZOS)
         cropped.save(new_path)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to save cropped upload-match image: %s", exc)
