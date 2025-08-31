@@ -224,7 +224,7 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
                 try:
                     region = canvas_image.crop((ox, oy, ox + 8, oy + 8))
                     # Apply a constant white overlay (single shade) under the glyph
-                    white_overlay = Image.new("RGBA", (8, 8), (255, 255, 255, 56))
+                    white_overlay = Image.new("RGBA", (8, 8), (255, 255, 255, 44))
                     region = Image.alpha_composite(region.convert("RGBA"), white_overlay)
                     canvas_image.paste(region, (ox, oy))
                 except Exception:
