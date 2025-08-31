@@ -5,6 +5,18 @@
 function info_client_init( )
 {
   //alias !info_client "sp_sc_func_load_file sofplus/addons/info_client.func"
+
+  spf_sc_list_add_func _sp_sv_on_map_begin "info_client_map_begin"
+
+  sp_sc_func_exec info_client_map_begin
+}
+
+function info_client_map_begin()
+{
+  set _spf_upload_pending 0
+  set _spf_upload_slot -1
+
+  set _spf_upload_hook_added 0
 }
 
 function info_client( )
@@ -113,20 +125,83 @@ function .match2(~slot, *)
 
 function .upload_match(~slot, *)
 {
-  set ~count 1
-  set ~extramsg
-  sp_sc_flow_while number cvar ~count <= val #~0
+
+  // Use a simple per-map flag variable; it will be initialised on map begin and cleared on map end
+  sp_sc_flow_if number cvar _spf_upload_pending == val 1
   {
-    sp_sc_cvar_copy ~val ~$~count
-    sset ~extramsg #~extramsg #~val
-    add ~count 1
+    set ~msg "%02An upload for this map is already scheduled; only one upload per map is allowed."
+    sp_sc_cvar_unescape ~msg ~msg
+    sp_sv_print_client #~slot #~msg
   }
+  else
+  {
+    set _spf_upload_pending 1
+    set _spf_upload_slot #~slot
 
-  sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".upload_match" $~slot #~extramsg
+    // Register the on_map_end callback via list function (register once)
+    sp_sc_flow_if number cvar _spf_upload_hook_added == val 1
+    {
+      // already registered
+    }
+    else
+    {
+      spf_sc_list_add_func _sp_sv_on_map_end "upload_match_on_map_end"
+      set _spf_upload_hook_added 1
+    }
 
-  sp_sv_print_client #~slot " OK."
-  sp_sv_print_client #~slot " The screenshot will be uploaded to Discord."
+    sp_sv_info_client #~slot
+  
+    sset ~msg #_sp_sv_info_client_name "%04issued %03.upload_match %04command; this match/map will be uploaded to Discord historic-public-matches channel when it finishes. issue %03.cancel_upload to cancel "
+    sp_sc_cvar_unescape ~msg ~msg
+    sp_sv_print_broadcast #~msg
+  }
+}
+
+function upload_match_on_map_end()
+{
+  // On map end perform upload if scheduled for the map
+  sp_sc_flow_if number cvar _spf_upload_pending == val 1
+  {
+    sp_sc_func_exec info_client
+    sp_sc_func_exec info_server ".upload_match" _spf_upload_slot ""
+
+    // Clear the pending flag
+    set _spf_upload_pending 0
+    set _spf_upload_slot 0
+  }
+}
+
+function .cancel_upload(~slot)
+{
+  sp_sc_flow_if number cvar _spf_upload_pending == val 1
+  {
+    // Only the player who scheduled the upload can cancel it
+    sp_sc_flow_if number cvar _spf_upload_slot == val #~slot
+    {
+      // Announce who cancelled
+      sp_sv_info_client #~slot
+      sset ~msg #_sp_sv_info_client_name "%04cancelled the scheduled upload for this map."
+      sp_sc_cvar_unescape ~msg ~msg
+      sp_sv_print_broadcast #~msg
+
+      // Clear pending state
+      set _spf_upload_pending 0
+      set _spf_upload_slot -1
+
+    }
+    else
+    {
+      set ~msg "%02You didn't schedule the upload; only the uploader can cancel."
+      sp_sc_cvar_unescape ~msg ~msg
+      sp_sv_print_client #~slot #~msg
+    }
+  }
+  else
+  {
+    set ~msg "%02There is no upload scheduled for this map."
+    sp_sc_cvar_unescape ~msg ~msg
+    sp_sv_print_client #~slot #~msg
+  }
 }
 
 function .want1(~slot, *)
