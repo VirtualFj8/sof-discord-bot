@@ -220,7 +220,7 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
             ox = xpos + x_offset
             oy = ypos
             # New rule: do not alter background unless the active inline color code is between 8 and 30 inclusive
-            if not color_override and current_color_code is not None and 8 <= current_color_code <= 30:
+            if not color_override and (current_color_code in {8, 11, 12, 14, 15, 16, 17, 18, 21, 27}):
                 try:
                     # Build a mask that covers background only: invert the glyph's alpha channel
                     try:
