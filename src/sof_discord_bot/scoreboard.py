@@ -186,6 +186,7 @@ def load_flags_from_paks(sof_dir: str) -> tuple[Optional[Image.Image], Optional[
 def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: str, xpos: int, ypos: int, color_override: Optional[str] = None) -> None:
     x_offset = 0
     current_color = "#00ff00"
+    current_color_code: Optional[int] = None
     # Accept bytes/bytearray directly to avoid rendering the Python repr (e.g. "b'...'"),
     # which would expose escape sequences as visible characters. Otherwise encode the
     # provided string to latin-1 bytes so we map exactly to the 0-255 spritesheet indices.
@@ -205,6 +206,7 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
                 if not color_override and char_code < len(COLOR_ARRAY):
                     logger.debug("draw_string_at: applying color code %d -> %s for string=%r", char_code, COLOR_ARRAY[char_code], string)
                     current_color = COLOR_ARRAY[char_code]
+                    current_color_code = char_code
                 else:
                     logger.debug("draw_string_at: encountered control byte %d but color override present or out of range for string=%r", char_code, string)
             except Exception:
@@ -217,67 +219,16 @@ def draw_string_at(canvas_image: Image.Image, spritesheet: Image.Image, string: 
             char_sprite = spritesheet.crop((x_clip, y_clip, x_clip + 8, y_clip + 8))
             ox = xpos + x_offset
             oy = ypos
-            # Adjust background under this glyph to improve contrast relative to text luminance
-            try:
-                c = final_color.lstrip('#')
-                r = int(c[0:2], 16)
-                g = int(c[2:4], 16)
-                b = int(c[4:6], 16)
-                luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
-            except Exception:
-                luminance = 1.0
-            try:
-                region = canvas_image.crop((ox, oy, ox + 8, oy + 8))
-                # Measure background luminance in the 8x8 region (0..1)
+            # New rule: do not alter background unless the active inline color code is between 8 and 30 inclusive
+            if not color_override and current_color_code is not None and 8 <= current_color_code <= 30:
                 try:
-                    bg_l = region.convert("L")
-                    bg_vals = list(bg_l.getdata())
-                    bg_lum = (sum(bg_vals) / (len(bg_vals) * 255.0)) if bg_vals else 0.0
-                except Exception:
-                    bg_lum = 0.0
-                # Strengthen adjustment for very dark text and very dark backgrounds
-                base_scale = 0.24
-                contrast_factor = 1.15
-                if luminance < 0.25:
-                    if bg_lum < 0.15:
-                        scale = 1.00
-                        contrast_factor = 1.60
-                    elif bg_lum < 0.30:
-                        scale = 0.85
-                        contrast_factor = 1.50
-                    elif bg_lum < 0.45:
-                        scale = 0.65
-                        contrast_factor = 1.35
-                    else:
-                        scale = 0.40
-                        contrast_factor = 1.25
-                else:
-                    scale = base_scale
-                brightness_factor = 1.0 + ((0.5 - luminance) * scale)
-                region = ImageEnhance.Brightness(region).enhance(brightness_factor)
-                region = ImageEnhance.Contrast(region).enhance(contrast_factor)
-                # Always apply a subtle white overlay; stronger on darker backgrounds and darker text
-                try:
-                    # weight by text luminance: darker text => stronger overlay
-                    if luminance < 0.25:
-                        text_weight = 1.00
-                    elif luminance < 0.60:
-                        text_weight = 0.75
-                    else:
-                        text_weight = 0.40
-                    # alpha normalized: more overlay when background is dark (1 - bg_lum)
-                    alpha_norm = max(0.0, min(1.0, (1.0 - bg_lum) * text_weight))
-                    min_alpha = 12   # always present but minimal on bright bg
-                    max_alpha = 88   # cap to avoid wash-out
-                    alpha_val = int(min_alpha + alpha_norm * (max_alpha - min_alpha))
-                    if alpha_val > 0:
-                        white_overlay = Image.new("RGBA", (8, 8), (255, 255, 255, alpha_val))
-                        region = Image.alpha_composite(region.convert("RGBA"), white_overlay)
+                    region = canvas_image.crop((ox, oy, ox + 8, oy + 8))
+                    # Apply a constant white overlay (single shade) under the glyph
+                    white_overlay = Image.new("RGBA", (8, 8), (255, 255, 255, 56))
+                    region = Image.alpha_composite(region.convert("RGBA"), white_overlay)
+                    canvas_image.paste(region, (ox, oy))
                 except Exception:
                     pass
-                canvas_image.paste(region, (ox, oy))
-            except Exception:
-                pass
             # Draw the glyph
             color_image = Image.new("RGBA", (8, 8), final_color)
             canvas_image.paste(color_image, (ox, oy), mask=char_sprite)
