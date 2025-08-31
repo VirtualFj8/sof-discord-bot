@@ -60,6 +60,7 @@ def generate_payload(
     needed_players: int | None = None,
     map_name: str | None = None,
     hostname: str | None = None,
+    uploader: str | None = None,
 ) -> dict:
     # Always build match request style embeds (live scoreboard removed)
     fields: List[dict] = []
@@ -140,10 +141,18 @@ def generate_payload(
     if image_url:
         embed["image"] = {"url": image_url}
 
+    # Top-level `content` will appear above the embed; show uploader there if provided
+    top_content = "\n\u200b\n 📣 **MATCH REQUEST** \n\u200b\n "
+    if uploader:
+        top_content = f"**Uploaded by:** {uploader}\n\n" + top_content
+
+    # Add a visible placeholder field below the teams/image
+    embed.setdefault("fields", []).append({"name": "Placeholder", "value": "(placeholder)", "inline": False})
+
     return {
         "username": "📣 Match Request",
         "avatar_url": "https://www.sof1.org/gallery/image/7656/medium",
-        "content": "\n\u200b\n 📣 **MATCH REQUEST** \n\u200b\n ",
+        "content": top_content,
         "embeds": [embed],
     }
 
