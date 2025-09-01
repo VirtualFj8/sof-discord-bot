@@ -54,7 +54,43 @@ function info_server(~discord_mode, ~discord_slot, ~discord_msg)
   sp_sc_cvar_save info_server/server.cfg hostname _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot ~discord_msg
 }
 
-function .wantplay(~slot, *)
+
+
+function upload_match_on_map_end()
+{
+  // 1 and a half server ticks to ensure we have all flag caps/points.
+  sset ~cmd sp_sc_func_exec upload_match_delayed #_spf_upload_slot
+  sp_sc_timer 150 #~cmd
+  
+}
+
+function upload_match_delayed(~slot)
+{
+  // Mark that we're in intermission so commands can detect it
+  set _spf_in_intermission 1
+  // On map end perform upload if scheduled for the map
+  sp_sc_flow_if number cvar _spf_upload_pending == val 1
+  {
+
+    sp_sc_func_exec info_client
+    sp_sc_func_exec info_server ".upload_match" #_spf_upload_slot ""
+
+    
+    sset ~msg "%04Scoreboard uploaded to %1Fhistoric-public-matches %04SoF discord channel. Type %03.discord %04for discord link." 
+    sp_sc_cvar_unescape ~msg ~msg
+    sp_sv_print_broadcast #~msg
+
+  }
+  else
+  {
+    // No upload was scheduled during the map; give players a last chance to request it
+    sset ~msg "%04No discord-upload scheduled for this map. Type %03.upload_match %04now to upload the scoreboard."
+    sp_sc_cvar_unescape ~msg ~msg
+    sp_sv_print_broadcast #~msg
+  }
+}
+
+function info_client_signal_discord(~signal, ~slot, ~extramsg)
 {
   set ~count 1
   set ~extramsg
@@ -66,65 +102,13 @@ function .wantplay(~slot, *)
   }
 
   sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".wantplay" $~slot #~extramsg
+  sp_sc_func_exec info_server #~signal $~slot #~extramsg
 
   sp_sv_print_client #~slot " OK."
   sp_sv_print_client #~slot " The message has been sent to  Discord."
 }
 
-function .wantmatch(~slot, *)
-{
-  set ~count 1
-  set ~extramsg
-  sp_sc_flow_while number cvar ~count <= val #~0
-  {
-    sp_sc_cvar_copy ~val ~$~count
-    sset ~extramsg #~extramsg #~val
-    add ~count 1
-  }
 
-  sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".wantmatch" $~slot #~extramsg
-
-  sp_sv_print_client #~slot " OK."
-  sp_sv_print_client #~slot " The message has been sent to  Discord."
-}
-
-function .match1(~slot, *)
-{
-  set ~count 1
-  set ~extramsg
-  sp_sc_flow_while number cvar ~count <= val #~0
-  {
-    sp_sc_cvar_copy ~val ~$~count
-    sset ~extramsg #~extramsg #~val
-    add ~count 1
-  }
-
-  sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".match1" $~slot #~extramsg
-
-  sp_sv_print_client #~slot " OK."
-  sp_sv_print_client #~slot " The message has been sent to  Discord."
-}
-
-function .match2(~slot, *)
-{
-  set ~count 1
-  set ~extramsg
-  sp_sc_flow_while number cvar ~count <= val #~0
-  {
-    sp_sc_cvar_copy ~val ~$~count
-    sset ~extramsg #~extramsg #~val
-    add ~count 1
-  }
-
-  sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".match2" $~slot #~extramsg
-
-  sp_sv_print_client #~slot " OK."
-  sp_sv_print_client #~slot " The message has been sent to  Discord."
-}
 
 function .upload_match(~slot, *)
 {
@@ -167,40 +151,6 @@ function .upload_match(~slot, *)
   }
 }
 
-function upload_match_on_map_end()
-{
-  // 1 and a half server ticks to ensure we have all flag caps/points.
-  sset ~cmd sp_sc_func_exec upload_match_delayed #_spf_upload_slot
-  sp_sc_timer 150 #~cmd
-  
-}
-
-function upload_match_delayed(~slot)
-{
-  // Mark that we're in intermission so commands can detect it
-  set _spf_in_intermission 1
-  // On map end perform upload if scheduled for the map
-  sp_sc_flow_if number cvar _spf_upload_pending == val 1
-  {
-
-    sp_sc_func_exec info_client
-    sp_sc_func_exec info_server ".upload_match" #_spf_upload_slot ""
-
-    
-    sset ~msg "%04Scoreboard uploaded to %1Fhistoric-public-matches %04SoF discord channel. Type %03.discord %04for discord link." 
-    sp_sc_cvar_unescape ~msg ~msg
-    sp_sv_print_broadcast #~msg
-
-  }
-  else
-  {
-    // No upload was scheduled during the map; give players a last chance to request it
-    sset ~msg "%04No discord-upload scheduled for this map. Type %03.upload_match %04now to upload the scoreboard."
-    sp_sc_cvar_unescape ~msg ~msg
-    sp_sv_print_broadcast #~msg
-  }
-}
-
 function .cancel_upload(~slot)
 {
   sp_sc_flow_if number cvar _spf_upload_pending == val 1
@@ -234,40 +184,34 @@ function .cancel_upload(~slot)
   }
 }
 
+function .wantplay(~slot, *)
+{
+  sp_sc_func_exec info_client_signal_discord ".wantplay" $~slot #~extramsg
+}
+
+function .wantmatch(~slot, *)
+{
+  sp_sc_func_exec info_client_signal_discord ".wantmatch" $~slot #~extramsg
+}
+
+function .match1(~slot, *)
+{
+  sp_sc_func_exec info_client_signal_discord ".match1" $~slot #~extramsg
+}
+
+function .match2(~slot, *)
+{
+  sp_sc_func_exec info_client_signal_discord ".match2" $~slot #~extramsg
+}
+
 function .want1(~slot, *)
 {
-  set ~count 1
-  set ~extramsg
-  sp_sc_flow_while number cvar ~count <= val #~0
-  {
-    sp_sc_cvar_copy ~val ~$~count
-    sset ~extramsg #~extramsg #~val
-    add ~count 1
-  }
-
-  sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".want1" $~slot #~extramsg
-
-  sp_sv_print_client #~slot " OK."
-  sp_sv_print_client #~slot " The message has been sent to  Discord."
+  sp_sc_func_exec info_client_signal_discord ".want1" $~slot #~extramsg
 }
 
 function .want2(~slot, *)
 {
-  set ~count 1
-  set ~extramsg
-  sp_sc_flow_while number cvar ~count <= val #~0
-  {
-    sp_sc_cvar_copy ~val ~$~count
-    sset ~extramsg #~extramsg #~val
-    add ~count 1
-  }
-
-  sp_sc_func_exec info_client
-  sp_sc_func_exec info_server ".want2" $~slot #~extramsg
-
-  sp_sv_print_client #~slot " OK."
-  sp_sv_print_client #~slot " The message has been sent to  Discord."
+  sp_sc_func_exec info_client_signal_discord ".want2" $~slot #~extramsg
 }
 
 function .discord(~slot)
