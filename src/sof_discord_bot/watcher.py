@@ -99,8 +99,8 @@ class ServerCfgEventHandler(FileSystemEventHandler):
                             import base64
                             caller_name = base64.b64decode(slot_player.get("name", "")).decode("latin-1")
                         except Exception:
-                            caller_name = "Unknown"
-                caller_name = caller_name or "Unknown"
+                            caller_name = ""
+                caller_name = caller_name or ""
 
                 mode = server.get("mode") or ""
                 custom_text = server.get("msg") or None

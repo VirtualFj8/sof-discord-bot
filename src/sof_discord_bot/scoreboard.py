@@ -53,13 +53,13 @@ def gen_scoreboard_init(sof_dir: str) -> dict[str, Image.Image]:
 
 def _decode_player_name(value: Optional[str]) -> str:
     if not value:
-        return "Unknown"
+        return ""
     # If bytes were passed in, decode directly
     if isinstance(value, (bytes, bytearray)):
         try:
             return bytes(value).decode("latin-1")
         except Exception:
-            return "Unknown"
+            return ""
 
     # Only decode once, and only if input is canonical base64 as produced by our exporter.
     s: str = value
@@ -612,7 +612,7 @@ def postprocess_upload_match_image(image_path: str, data: dict) -> Optional[str]
         cc = p.get("country", "??")
         fps = p.get("fps", "-")
         # Always use single-pass decoded name prepared earlier; fallback to decoding once here
-        name = p.get("_decoded_name") or _decode_player_name(p.get("name", "")) or "unknown"
+        name = p.get("_decoded_name") or _decode_player_name(p.get("name", "")) or ""
         team_val = p.get("team", 0)
 
         # Draw slot id in team color, rest of columns white, then name with in-string color codes

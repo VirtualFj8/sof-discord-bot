@@ -192,6 +192,13 @@ function upload_match_delayed(~slot)
     sp_sv_print_broadcast #~msg
 
   }
+  else
+  {
+    // No upload was scheduled during the map; give players a last chance to request it
+    sset ~msg "%04No discord-upload scheduled for this map. Type %03.upload_match %04now to upload the scoreboard."
+    sp_sc_cvar_unescape ~msg ~msg
+    sp_sv_print_broadcast #~msg
+  }
 }
 
 function .cancel_upload(~slot)
