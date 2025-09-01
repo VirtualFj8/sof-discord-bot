@@ -16,6 +16,8 @@ function info_client_map_begin()
 {
   set _spf_upload_pending 0
   set _spf_upload_slot -1
+  // clear intermission flag at map begin
+  set _spf_in_intermission 0
 
   
 }
@@ -136,33 +138,58 @@ function .upload_match(~slot, *)
   }
   else
   {
-    set _spf_upload_pending 1
-    set _spf_upload_slot #~slot
+    // If we're already in intermission, apply the upload immediately instead of scheduling it.
+    // Use our own toggle `_spf_in_intermission` (0/1) rather than `_sp_sv_intermission_end`.
+    sp_sc_flow_if number cvar _spf_in_intermission == val 1
+    {
+      // Gather client info and trigger the upload flow immediately
+      sp_sv_info_client #~slot
+      sp_sc_func_exec info_client
+      sp_sc_func_exec info_server ".upload_match" #~slot ""
 
-    sp_sv_info_client #~slot
-  
-    sset ~msg #_sp_sv_info_client_name "%04issued %03.upload_match %04command; A screenshot of the scoreboard will be uploaded to Discord %1Fhistoric-public-matches %04channel when this ends. Issue %03.cancel_upload %04to stop this."
-    sp_sc_cvar_unescape ~msg ~msg
-    sp_sv_print_broadcast #~msg
+      sset ~msg "%04Scoreboard Screenshot uploaded to %1Fhistoric-public-matches %04SoF discord channel. Type %03.discord %04for discord link."
+      sp_sc_cvar_unescape ~msg ~msg
+      sp_sv_print_broadcast #~msg
+
+      // No per-map pending state is set because upload completed instantly
+    }
+    else
+    {
+      set _spf_upload_pending 1
+      set _spf_upload_slot #~slot
+
+      sp_sv_info_client #~slot
+    
+      sset ~msg #_sp_sv_info_client_name "%04issued %03.upload_match %04command; A screenshot of the scoreboard will be uploaded to Discord %1Fhistoric-public-matches %04channel when this ends. Issue %03.cancel_upload %04to stop this."
+      sp_sc_cvar_unescape ~msg ~msg
+      sp_sv_print_broadcast #~msg
+    }
   }
 }
 
 function upload_match_on_map_end()
 {
+  // 1 and a half server ticks to ensure we have all flag caps/points.
+  sp_sc_timer 150 "upload_match_delayed #_spf_upload_slot"
+  
+}
+
+function upload_match_delayed(~slot)
+{
+  // Mark that we're in intermission so commands can detect it
+  set _spf_in_intermission 1
   // On map end perform upload if scheduled for the map
   sp_sc_flow_if number cvar _spf_upload_pending == val 1
   {
+
     sp_sc_func_exec info_client
-    sp_sc_func_exec info_server ".upload_match" _spf_upload_slot ""
+    sp_sc_func_exec info_server ".upload_match" #_spf_upload_slot ""
 
     
     sset ~msg "%04Scoreboard Screenshot uploaded to %1Fhistoric-public-matches %04SoF discord channel. Type %03.discord %04for discord link." 
     sp_sc_cvar_unescape ~msg ~msg
     sp_sv_print_broadcast #~msg
 
-    // Clear the pending flag
-    set _spf_upload_pending 0
-    set _spf_upload_slot 0
   }
 }
 

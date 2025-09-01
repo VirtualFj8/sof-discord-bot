@@ -19,8 +19,11 @@ Variables/expansion
 - Dynamic cvar names: `sp_sc_cvar_sset ~tmp prefix #suffix` → `set #~tmp value`
 
 Assign/math
-- `set`, `zero`, `add`; text via `sset`
-- `sp_sc_cvar_copy`, `sp_sc_cvar_escape`, `sp_sc_cvar_unescape`
+- set <CVAR> <VAL> <RARELY USED OPTIONAL FLAGS>
+- sset <CVAR> <ARGS...> (This joins all args together with spaces inbetween them and stores in CVAR)
+- sp_sc_cvar_sset (Like sset except it does not put spaces inbetween the arguments)
+- zero <CVAR> (Clears the cvar to "" empty string)
+- add <CVAR> <VAL> (Performs math, trick:if you add 0, the cvar becomes 0 if its not a valid number eg.)
 
 Flow
 - if: `sp_sc_flow_if text|number cvar|val A <op> cvar|val B {true clause} {else clause}`
