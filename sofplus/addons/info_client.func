@@ -187,7 +187,7 @@ function upload_match_delayed(~slot)
     sp_sc_func_exec info_server ".upload_match" #_spf_upload_slot ""
 
     
-    sset ~msg "%04Scoreboard Screenshot uploaded to %1Fhistoric-public-matches %04SoF discord channel. Type %03.discord %04for discord link." 
+    sset ~msg "%04Scoreboard uploaded to %1Fhistoric-public-matches %04SoF discord channel. Type %03.discord %04for discord link." 
     sp_sc_cvar_unescape ~msg ~msg
     sp_sv_print_broadcast #~msg
 
