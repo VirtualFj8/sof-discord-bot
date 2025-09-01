@@ -170,7 +170,7 @@ function .upload_match(~slot, *)
 function upload_match_on_map_end()
 {
   // 1 and a half server ticks to ensure we have all flag caps/points.
-  sset ~cmd upload_match_delayed #_spf_upload_slot
+  sset ~cmd sp_sc_func_exec upload_match_delayed #_spf_upload_slot
   sp_sc_timer 150 #~cmd
   
 }
