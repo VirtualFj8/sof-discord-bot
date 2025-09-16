@@ -60,20 +60,20 @@ function info_client_tmp()
   sp_sc_flow_while number cvar ~slot < cvar maxclients
   {
     zero _sp_sv_info_client_ip
-    sp_sc_cvar_sset ~file info_client/ tmp_player_ $~slot .cfg
+    sp_sc_cvar_sset ~discord_file info_client/ tmp_player_ $~slot .cfg
 
     sp_sv_info_client #~slot
     sp_sc_flow_if text cvar _sp_sv_info_client_ip != val ""
     {
-      sp_sc_cvar_save #~file _sp_sv_info_client_*
+      sp_sc_cvar_save #~discord_file _sp_sv_info_client_*
     }
     else
     {
       // Delete file if it exist
-      sp_sc_file_find ~f sofplus/data/$~file filesystem file
+      sp_sc_file_find ~f sofplus/data/$~discord_file filesystem file
       sp_sc_flow_if number cvar ~f_0 == val 1
       {
-        sp_sc_cvar_save #~file ""
+        sp_sc_cvar_save #~discord_file ""
       }
     }
 
@@ -91,18 +91,19 @@ function info_client()
     sp_sc_cvar_sset ~file_tmp info_client/ tmp_player_ $~slot .cfg
     sp_sc_cvar_sset ~discord_file info_client/ player_ $~slot .cfg
 
+    zero _sp_sv_info_client_ip
     sp_sc_exec_file #~file_tmp
     sp_sc_flow_if text cvar _sp_sv_info_client_ip != val ""
     {
-      sp_sc_cvar_save #~discord_file _sp_sv_info_client_*
+      sp_sc_cvar_save #~file _sp_sv_info_client_*
     }
     else
     {
       // Delete file if it exist
-      sp_sc_file_find ~f sofplus/data/$~discord_file filesystem file
+      sp_sc_file_find ~f sofplus/data/$~file filesystem file
       sp_sc_flow_if number cvar ~f_0 == val 1
       {
-        sp_sc_cvar_save #~discord_file ""
+        sp_sc_cvar_save #~file ""
       }
     }
 
