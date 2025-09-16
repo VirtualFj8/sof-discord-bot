@@ -88,32 +88,27 @@ function info_client()
   set ~slot 0
   sp_sc_flow_while number cvar ~slot < cvar maxclients
   {
-    sp_sc_cvar_sset ~file_tmp info_client/ tmp_player_ $~slot .cfg
+    sp_sc_cvar_sset ~file_tmp sofplus/data/info_client/ tmp_player_ $~slot .cfg
     sp_sc_cvar_sset ~discord_file info_client/ player_ $~slot .cfg
 
     zero _sp_sv_info_client_ip
     sp_sc_exec_file #~file_tmp
-
-    sp_sc_timer_2 1 sp_sc_func_exec info_client_step2 #~slot #~discord_file
-    add ~slot 1
-  }
-}
-
-function info_client_step2(~slot, ~discord_file)
-{
-  sp_sc_flow_if text cvar _sp_sv_info_client_ip != val ""
-  {
-    echo saving to #~discord_file
-    sp_sc_cvar_save #~discord_file _sp_sv_info_client_*
-  }
-  else
-  {
-    // Delete file if it exist
-    sp_sc_file_find ~f sofplus/data/$~discord_file filesystem file
-    sp_sc_flow_if number cvar ~f_0 == val 1
+    sp_sc_flow_if text cvar _sp_sv_info_client_ip != val ""
     {
-      sp_sc_cvar_save #~discord_file ""
+      echo saving to #~discord_file
+      sp_sc_cvar_save #~discord_file _sp_sv_info_client_*
     }
+    else
+    {
+      // Delete file if it exist
+      sp_sc_file_find ~f sofplus/data/$~discord_file filesystem file
+      sp_sc_flow_if number cvar ~f_0 == val 1
+      {
+        sp_sc_cvar_save #~discord_file ""
+      }
+    }
+
+    add ~slot 1
   }
 }
 
@@ -124,17 +119,9 @@ function info_server_tmp(~winner, ~end_reason, ~capping_slot)
 
 function info_server(~discord_mode, ~discord_slot, ~discord_msg)
 {
-  sp_sc_exec_file info_server/tmp_server.cfg
-
-  sp_sc_timer_2 1 sp_sc_func_exec info_server_step2 #~discord_mode #~discord_slot #~discord_msg
-  
-}
-
-function info_server_step2(~discord_mode, ~discord_slot, ~discord_msg)
-{
+  sp_sc_exec_file sofplus/data/info_server/tmp_server.cfg
   sp_sc_cvar_save info_server/server.cfg hostname ctf_loops _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot ~discord_msg ~end_reason ~winner ~capping_slot
 }
-
 
 
 function upload_match_on_map_end()
