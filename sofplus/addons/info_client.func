@@ -182,12 +182,12 @@ function upload_match_on_map_end()
         sp_sc_flow_if text cvar ~blue_flag_state == val "r"
         {
           set ~winner "red"
-          sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_blue 1 2
+          sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_red 1 2
         }
         else
         {
           set ~winner "blue"
-          sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_red 1 2
+          sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_blue 1 2
         }
       }
     }    
