@@ -133,6 +133,10 @@ function upload_match_on_map_end()
     }
   }
   
+  ~max_frags
+  ~gametime
+  ~timelimit
+  
   sp_sc_cvar_copy ~timelimit timelimit 
   sp_sc_cvar_math_mul ~timelimit 60
 
