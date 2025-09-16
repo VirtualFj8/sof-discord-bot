@@ -110,12 +110,12 @@ function info_client()
   }
 }
 
-function info_server_tmp()
+function info_server_tmp(~winner, ~end_reason, ~capping_slot)
 {
   sp_sc_cvar_save info_server/tmp_server.cfg hostname ctf_loops _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~winner ~end_reason ~capping_slot
 }
 
-function info_server(~discord_mode, ~discord_slot, ~discord_msg, ~end_reason, ~winner, ~capping_slot)
+function info_server(~discord_mode, ~discord_slot, ~discord_msg)
 {
   sp_sc_exec_file info_server/tmp_server.cfg
   sp_sc_cvar_save info_server/server.cfg hostname ctf_loops _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot ~discord_msg ~end_reason ~winner ~capping_slot
@@ -225,7 +225,7 @@ function upload_match_on_map_end()
     }    
   }
   //Save this too.
-  sp_sc_func_exec info_server_tmp
+  sp_sc_func_exec info_server_tmp #~winner #~end_reason #~capping_slot
         
   //slight delay
   sset ~cmd sp_sc_func_exec !upload_match_delayed #_spf_upload_slot
