@@ -54,13 +54,13 @@ function info_client_paused_changed(~name)
   }
 }
 
-function info_client( )
+function info_client_tmp()
 {
   set ~slot 0
   sp_sc_flow_while number cvar ~slot < cvar maxclients
   {
     zero _sp_sv_info_client_ip
-    sp_sc_cvar_sset ~file info_client/player_$~slot .cfg
+    sp_sc_cvar_sset ~file info_client/ tmp_player_ $~slot .cfg
 
     sp_sv_info_client #~slot
     sp_sc_flow_if text cvar _sp_sv_info_client_ip != val ""
@@ -81,17 +81,53 @@ function info_client( )
   }
 }
 
+function info_client()
+{
+  
+
+  set ~slot 0
+  sp_sc_flow_while number cvar ~slot < cvar maxclients
+  {
+    sp_sc_cvar_sset ~file_tmp info_client/ tmp_player_ $~slot .cfg
+    sp_sc_cvar_sset ~discord_file info_client/ player_ $~slot .cfg
+
+    sp_sc_exec_file #~file_tmp
+    sp_sc_flow_if text cvar _sp_sv_info_client_ip != val ""
+    {
+      sp_sc_cvar_save #~discord_file _sp_sv_info_client_*
+    }
+    else
+    {
+      // Delete file if it exist
+      sp_sc_file_find ~f sofplus/data/$~discord_file filesystem file
+      sp_sc_flow_if number cvar ~f_0 == val 1
+      {
+        sp_sc_cvar_save #~discord_file ""
+      }
+    }
+
+    add ~slot 1
+  }
+}
+
+function info_server_tmp()
+{
+  sp_sc_cvar_save info_server/tmp_server.cfg hostname ctf_loops _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~winner ~end_reason ~capping_slot
+}
+
 function info_server(~discord_mode, ~discord_slot, ~discord_msg, ~end_reason, ~winner, ~capping_slot)
 {
+  sp_sc_exec_file info_server/tmp_server.cfg
   sp_sc_cvar_save info_server/server.cfg hostname ctf_loops _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot ~discord_msg ~end_reason ~winner ~capping_slot
 }
 
 
-
 function upload_match_on_map_end()
 {
-   //Figure out how the match ended (fraglimit/timelimit/flaglimit)
-  
+  //Always snapshot instantly (for disconnects).
+  sp_sc_func_exec info_client_tmp
+
+  //Figure out how the match ended (fraglimit/timelimit/flaglimit)
   set ~i 0
   set ~max_time 0
   set ~max_frags 0
@@ -188,27 +224,27 @@ function upload_match_on_map_end()
       }
     }    
   }
+  //Save this too.
+  sp_sc_func_exec info_server_tmp
         
   //slight delay
-  sset ~cmd sp_sc_func_exec !upload_match_delayed #_spf_upload_slot #~end_reason #~winner #~capping_slot
+  sset ~cmd sp_sc_func_exec !upload_match_delayed #_spf_upload_slot
   sp_sc_timer 150 #~cmd
   
 }
 
-function upload_match_delayed(~slot, ~end_reason, ~winner, ~capping_slot)
+function upload_match_delayed(~slot)
 {
   // Mark that we're in intermission so commands can detect it
   set _spf_in_intermission 1
 
  
-
-
   // On map end perform upload if scheduled for the map
   sp_sc_flow_if number cvar _spf_upload_pending == val 1
   {
 
     sp_sc_func_exec info_client
-    sp_sc_func_exec info_server ".upload_match" #_spf_upload_slot "" #~end_reason #~winner #~capping_slot
+    sp_sc_func_exec info_server ".upload_match" #_spf_upload_slot ""
 
     
     sset ~msg "%04Scoreboard uploaded to %1Fhistoric-public-matches %04SoF discord channel. Type %03.discord %04for discord link." 
@@ -223,24 +259,6 @@ function upload_match_delayed(~slot, ~end_reason, ~winner, ~capping_slot)
     sp_sc_cvar_unescape ~msg ~msg
     sp_sv_print_broadcast #~msg
   }
-}
-
-function info_client_signal_discord(~signal, ~slot, ~extramsg)
-{
-  set ~count 1
-  set ~extramsg
-  sp_sc_flow_while number cvar ~count <= val #~0
-  {
-    sp_sc_cvar_copy ~val ~$~count
-    sset ~extramsg #~extramsg #~val
-    add ~count 1
-  }
-
-  sp_sc_func_exec info_client
-  sp_sc_func_exec info_server #~signal $~slot #~extramsg
-
-  sp_sv_print_client #~slot " OK."
-  sp_sv_print_client #~slot " The message has been sent to  Discord."
 }
 
 
@@ -260,8 +278,6 @@ function .upload_match(~slot, *)
     // If we're already in intermission, apply the upload immediately instead of scheduling it.
     sp_sc_flow_if number cvar _spf_in_intermission == val 1
     {
-      // Gather client info and trigger the upload flow immediately
-      sp_sv_info_client #~slot
       sp_sc_func_exec info_client
       sp_sc_func_exec info_server ".upload_match" #~slot ""
 
@@ -318,39 +334,10 @@ function .cancel_upload(~slot)
   }
 }
 
-function .wantplay(~slot, *)
-{
-  sp_sc_func_exec info_client_signal_discord ".wantplay" $~slot #~extramsg
-}
-
-function .wantmatch(~slot, *)
-{
-  sp_sc_func_exec info_client_signal_discord ".wantmatch" $~slot #~extramsg
-}
-
-function .match1(~slot, *)
-{
-  sp_sc_func_exec info_client_signal_discord ".match1" $~slot #~extramsg
-}
-
-function .match2(~slot, *)
-{
-  sp_sc_func_exec info_client_signal_discord ".match2" $~slot #~extramsg
-}
-
-function .want1(~slot, *)
-{
-  sp_sc_func_exec info_client_signal_discord ".want1" $~slot #~extramsg
-}
-
-function .want2(~slot, *)
-{
-  sp_sc_func_exec info_client_signal_discord ".want2" $~slot #~extramsg
-}
 
 function .discord(~slot)
 {
-  set ~msg "%04type %03condump discord %04in console (copy from User/discord.txt). Discord link: https://discord.com/channels/690023187274399779/1405167363531341955"
+  set ~msg "%04type %03condump discord %04in console (copy from User/discord.txt). Discord link: https://discord.gg/zZjnsRKPEJ"
   sp_sc_cvar_unescape ~msg ~msg
   sp_sv_print_broadcast #~msg
 }

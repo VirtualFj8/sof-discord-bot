@@ -114,7 +114,12 @@ def load_player_data_from_files(directory_path: str) -> List[Optional[dict]]:
 
 def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dict]:
     server_cfg_path = os.path.join(sofplus_data_path, "info_server/server.cfg")
-    player_data_path = os.path.join(sofplus_data_path, "info_client")
+    # Prefer a snapshot directory if present; fall back to live info_client
+    snap_path = os.path.join(sofplus_data_path, "info_client_snap")
+    if os.path.isdir(snap_path):
+        player_data_path = snap_path
+    else:
+        player_data_path = os.path.join(sofplus_data_path, "info_client")
 
     server_data = load_server_data(server_cfg_path)
     if not server_data:
