@@ -1,0 +1,49 @@
+function sp_sc_timer2_init()
+{
+    sp_sc_func_alias sp_sc_timer_2 sp_sc_timer_2
+}
+
+function unHex(*)
+{
+	zero ~cmd
+
+	//rebuild the command by applying double quotes to args
+	set ~i 1
+	sp_sc_flow_while number cvar ~i <= cvar ~0
+	{
+		sp_sc_cvar_copy ~val ~$~i
+
+        sp_sc_cvar_unhex ~val ~val
+        sp_sc_flow_if number cvar ~i > val 1
+        {
+            sp_sc_cvar_append ~cmd " " %22 #~val %22
+        }
+        else
+        {
+            //first arg == actual command
+            sp_sc_cvar_copy ~cmd ~val
+        }
+
+		add ~i 1
+	}
+	
+	sp_sc_cvar_unescape ~cmd ~cmd
+	sp_sc_exec_cvar ~cmd
+}
+function sp_sc_timer_2(~delay, *)
+{
+
+    set ~tmp "sp_sc_func_exec unHex" 
+	set ~i 1
+	sp_sc_flow_while number cvar ~i <= cvar ~0
+	{
+		sp_sc_cvar_copy ~val ~$~i
+		
+		sp_sc_cvar_hex ~val ~val
+		sp_sc_cvar_append ~tmp " " $~val 
+        
+		add ~i 1
+	}
+
+    sp_sc_timer #~delay #~tmp
+}

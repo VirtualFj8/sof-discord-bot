@@ -93,8 +93,8 @@ function info_client()
 
     zero _sp_sv_info_client_ip
     sp_sc_exec_file #~file_tmp
-    sp_sc_func_exec info_client_step2 #~slot #~discord_file
 
+    sp_sc_timer_2 1 sp_sc_func_exec info_client_step2 #~slot #~discord_file
     add ~slot 1
   }
 }
@@ -125,7 +125,9 @@ function info_server_tmp(~winner, ~end_reason, ~capping_slot)
 function info_server(~discord_mode, ~discord_slot, ~discord_msg)
 {
   sp_sc_exec_file info_server/tmp_server.cfg
-  sp_sc_func_exec info_server_step2 #~discord_mode #~discord_slot #~discord_msg
+
+  sp_sc_timer_2 1 sp_sc_func_exec info_server_step2 #~discord_mode #~discord_slot #~discord_msg
+  
 }
 
 function info_server_step2(~discord_mode, ~discord_slot, ~discord_msg)
