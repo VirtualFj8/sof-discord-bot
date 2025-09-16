@@ -165,7 +165,7 @@ function upload_match_on_map_end()
       }
     }
   }
-  
+
   sp_sc_flow_if text cvar ~end_reason == val "unknown"
   {
     echo Debug flaglimit pathway
@@ -181,19 +181,19 @@ function upload_match_on_map_end()
       
         sp_sc_flow_if text cvar ~blue_flag_state == val "r"
         {
-          set ~winner "blue"
+          set ~winner "red"
           sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_blue 1 2
         }
         else
         {
-          set ~winner "red"
+          set ~winner "blue"
           sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_red 1 2
         }
       }
     }    
   }
         
-
+  echo EndReason = $~end_reason .. Winner = ~winner .. CappingSlot = ~capping_slot
   //slight delay
   sset ~cmd sp_sc_func_exec !upload_match_delayed #_spf_upload_slot #~end_reason #~winner #~capping_slot
   sp_sc_timer 150 #~cmd
