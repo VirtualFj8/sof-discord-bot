@@ -128,7 +128,7 @@ function upload_match_on_map_end()
   else
   {
     sp_sc_info_time
-    sp_sc_cvar_math_sub _sp_sc_info_time_sec #_spf_game_time_start
+    sp_sc_cvar_math_sub _sp_sc_info_time_sec #_spf_gametime_start
     sp_sc_cvar_copy ~gametime _sp_sc_info_time_sec
 
     sp_sc_flow_if number cvar _sp_sv_timelimit_mod == val 2
