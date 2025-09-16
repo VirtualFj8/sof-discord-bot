@@ -95,7 +95,6 @@ function info_client()
     sp_sc_exec_file #~file_tmp
     sp_sc_flow_if text cvar _sp_sv_info_client_ip != val ""
     {
-      echo saving to #~discord_file
       sp_sc_cvar_save #~discord_file _sp_sv_info_client_*
     }
     else
