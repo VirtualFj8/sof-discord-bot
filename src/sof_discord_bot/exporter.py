@@ -123,21 +123,22 @@ def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dic
     loaded_players = load_player_data_from_files(player_data_path)
     data = {"server": server_data, "players": loaded_players}
 
-    if data.get("~end_reason") == "flaglimit":
+    if server_data.get("~end_reason") == "flaglimit":
         # Correct data.players[i].flags_captured for the winning team
         winner = server_data.get("~winner")
         capping_slot = server_data.get("~capping_slot")
         
-        for player in data["players"]:
+        for player in loaded_players:
             team = player.get("team")
             # Map team number to color: 0 -> "blue", 1 -> "red"
             team_color = "blue" if team == 0 else "red" if team == 1 else None
             if team_color == winner and player.get("slot") == capping_slot:
                 player["flags_captured"] = player.get("flags_captured", 0) + 1
         if winner == "blue":
-            data["server"]["num_flags_blue"] = data["server"].get("num_flags_blue", 0) + 1
+            server_data["num_flags_blue"] = server_data.get("num_flags_blue", 0) + 1
         elif winner == "red":
-            data["server"]["num_flags_red"] = data["server"].get("num_flags_red", 0) + 1
+            server_data["num_flags_red"] = server_data.get("num_flags_red", 0) + 1
     
-    logger.info("Read data successfully for port %s, the match ended with %s", port, data.get("~end_reason"))
+
+    logger.info("Read data successfully for port %s, the match ended with %s", port, server_data.get("~end_reason"))
     return data
