@@ -154,7 +154,7 @@ function upload_match_on_map_end()
   else
   {
     //fraglimit or flaglimit
-    sp_sc_flow_if cvar ~max_frags >= cvar fraglimit
+    sp_sc_flow_if number cvar ~max_frags >= cvar fraglimit
     {
       set ~end_reason "fraglimit"
     }
