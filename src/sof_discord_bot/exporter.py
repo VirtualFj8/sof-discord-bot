@@ -22,9 +22,15 @@ def load_server_data(filepath: str) -> Dict[str, Any]:
                     continue
                 key, value = match.groups()
                 if key == "ctf_loops":
-                    server_data[key] = int(value)
+                    try:
+                        server_data[key] = int(value)
+                    except ValueError:
+                        server_data[key] = value
                 elif key == "~capping_slot":
-                    server_data[key] = int(value)
+                    try:
+                        server_data[key] = int(value)
+                    except ValueError:
+                        server_data[key] = value
                 elif key.startswith("~discord_"):
                     clean_key = key.replace("~discord_", "")
                     if clean_key == "slot":
