@@ -166,8 +166,10 @@ function upload_match_on_map_end()
     }
     else
     {
+      echo Debug flaglimit pathway
       sp_sc_flow_if number cvar deathmatch == val 4
       {
+        echo Debug flatlimit deathmatch 4 confirmed
         //share flaglimit to the discord script (hidden data)
         set ~end_reason "flaglimit"
         sp_sc_cvar_substr ~blue_flag_state _sp_sv_info_flag_blue 0 1
