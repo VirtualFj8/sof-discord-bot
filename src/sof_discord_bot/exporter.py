@@ -126,20 +126,21 @@ def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dic
     if server_data.get("~end_reason") == "flaglimit":
         # Correct data.players[i].flags_captured for the winning team
         winner = server_data.get("~winner")
-        capping_slot = server_data.get("~capping_slot")
+        capping_slot = server_data.get("~capping_slot","-1")
         
-        for player in loaded_players:
-            if player is None:
-                continue
-            team = player.get("team")
-            # Map team number to color: 0 -> "blue", 1 -> "red"
-            team_color = "blue" if team == 0 else "red" if team == 1 else None
-            if team_color == winner and player.get("slot") == capping_slot:
-                player["flags_captured"] = player.get("flags_captured", 0) + 1
-        if winner == "blue":
-            server_data["num_flags_blue"] = server_data.get("num_flags_blue", 0) + 1
-        elif winner == "red":
-            server_data["num_flags_red"] = server_data.get("num_flags_red", 0) + 1
+        if isinstance(capping_slot, int) and 0 <= capping_slot < len(loaded_players):
+            for idx, player in enumerate(loaded_players):
+                if player is None:
+                    continue
+                team = player.get("team")
+                # Map team number to color: 0 -> "blue", 1 -> "red"
+                team_color = "blue" if team == 0 else "red" if team == 1 else None
+                if team_color == winner and idx == capping_slot:
+                    player["flags_captured"] = player.get("flags_captured", 0) + 1
+            if winner == "blue":
+                server_data["num_flags_blue"] = server_data.get("num_flags_blue", 0) + 1
+            elif winner == "red":
+                server_data["num_flags_red"] = server_data.get("num_flags_red", 0) + 1
     
 
     logger.info("Read data successfully for port %s, the match ended with %s", port, server_data.get("~end_reason"))
