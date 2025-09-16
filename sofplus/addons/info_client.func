@@ -147,39 +147,47 @@ function upload_match_on_map_end()
   ~timelimit
 
   set ~end_reason "unknown"
-  sp_sc_flow_if number cvar ~gametime >= cvar ~timelimit
+  sp_sc_flow_if number cvar timelimit > val 0
   {
-    set ~end_reason "timelimit"
+    sp_sc_flow_if number cvar ~gametime >= cvar ~timelimit
+    {
+      set ~end_reason "timelimit"
+    }
   }
   else
   {
     //fraglimit or flaglimit
-    sp_sc_flow_if number cvar ~max_frags >= cvar fraglimit
+    sp_sc_flow_if number cvar fraglimit > val 0
     {
-      set ~end_reason "fraglimit"
+      sp_sc_flow_if number cvar ~max_frags >= cvar fraglimit
+      {
+        set ~end_reason "fraglimit"
+      }
     }
     else
     {
-      //share flaglimit to the discord script (hidden data)
-      set ~end_reason "flaglimit"
-      sp_sc_cvar_substr ~blue_flag_state _sp_sv_info_flag_blue 0 1
-      
-      sp_sc_flow_if text cvar ~blue_flag_state == val "r"
+      sp_sc_flow_if number cvar deathmatch == val 4
       {
-        set ~winner "blue"
-        sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_blue 1 2
-      }
-      else
-      {
-        set ~winner "red"
-        sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_red 1 2
-      }
+        //share flaglimit to the discord script (hidden data)
+        set ~end_reason "flaglimit"
+        sp_sc_cvar_substr ~blue_flag_state _sp_sv_info_flag_blue 0 1
       
+        sp_sc_flow_if text cvar ~blue_flag_state == val "r"
+        {
+          set ~winner "blue"
+          sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_blue 1 2
+        }
+        else
+        {
+          set ~winner "red"
+          sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_red 1 2
+        }
+      }
     }
   }
 
   //slight delay
-  sset ~cmd sp_sc_func_exec upload_match_delayed #_spf_upload_slot #~end_reason #~winner #~capping_slot
+  sset ~cmd sp_sc_func_exec !upload_match_delayed #_spf_upload_slot #~end_reason #~winner #~capping_slot
   sp_sc_timer 150 #~cmd
   
 }
