@@ -137,7 +137,7 @@ function upload_match_on_map_end()
   sp_sc_cvar_math_mul ~timelimit 60
 
   set ~end_reason "unknown"
-  sp_sc_flow_if number cvar ~gametime >= cvar timelimit
+  sp_sc_flow_if number cvar ~gametime >= cvar ~timelimit
   {
     set ~end_reason "timelimit"
   }
