@@ -193,7 +193,7 @@ function upload_match_on_map_end()
     }    
   }
         
-  echo EndReason = $~end_reason .. Winner = ~winner .. CappingSlot = ~capping_slot
+  echo EndReason = $~end_reason .. Winner = #~winner .. CappingSlot = #~capping_slot
   //slight delay
   sset ~cmd sp_sc_func_exec !upload_match_delayed #_spf_upload_slot #~end_reason #~winner #~capping_slot
   sp_sc_timer 150 #~cmd
