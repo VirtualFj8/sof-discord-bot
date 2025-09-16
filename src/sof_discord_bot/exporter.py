@@ -129,6 +129,8 @@ def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dic
         capping_slot = server_data.get("~capping_slot")
         
         for player in loaded_players:
+            if player is None:
+                continue
             team = player.get("team")
             # Map team number to color: 0 -> "blue", 1 -> "red"
             team_color = "blue" if team == 0 else "red" if team == 1 else None
