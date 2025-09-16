@@ -95,23 +95,28 @@ function upload_match_on_map_end()
   set ~i 0
   set ~max_time 0
   set ~max_frags 0
-  sp_sc_flow_while number cvar ~i < val 32
+  sp_sc_flow_while number cvar ~i < cvar maxclients
   {
-    sp_sv_info_client #~i
-    sp_sc_flow_if number cvar _sp_sv_info_client_frames_total > cvar ~max_time
+    sp_sv_info_client $~i
+    sp_sc_flow_if text cvar _sp_sv_info_client_ip != val ""
     {
-      sp_sc_cvar_copy ~max_time _sp_sv_info_client_frames_total
-      
+      sp_sc_flow_if number cvar _sp_sv_info_client_frames_total > cvar ~max_time
+      {
+        sp_sc_cvar_copy ~max_time _sp_sv_info_client_frames_total
+        
+      }
+      sp_sc_flow_if number cvar _sp_sv_info_client_frags > cvar ~max_frags
+      {
+        sp_sc_cvar_copy ~max_frags _sp_sv_info_client_frags
+      }
     }
-    sp_sc_flow_if number cvar _sp_sv_info_client_frags > cvar ~max_frags
-    {
-      sp_sc_cvar_copy ~max_frags _sp_sv_info_client_frags
-    }
+    
 
     add ~i 1
   }
 
-  sp_sc_flow_if cvar _sp_sv_timelimit_mod = val 0
+  
+  sp_sc_flow_if number cvar _sp_sv_timelimit_mod == val 0
   {
     //counting starts from player that has been in the server the longest
 
@@ -126,19 +131,20 @@ function upload_match_on_map_end()
     sp_sc_cvar_math_sub _sp_sc_info_time_sec #_spf_game_time_start
     sp_sc_cvar_copy ~gametime _sp_sc_info_time_sec
 
-    sp_sc_flow_if cvar _sp_sv_timelimit_mod = val 2
+    sp_sc_flow_if number cvar _sp_sv_timelimit_mod == val 2
     {
       //factor in paused deduction
       sp_sc_cvar_math_sub ~gametime #_spf_paused_time
     }
   }
   
+  sp_sc_cvar_copy ~timelimit timelimit 
+  sp_sc_cvar_math_mul ~timelimit 60
+
+  ~max_time
   ~max_frags
   ~gametime
   ~timelimit
-  
-  sp_sc_cvar_copy ~timelimit timelimit 
-  sp_sc_cvar_math_mul ~timelimit 60
 
   set ~end_reason "unknown"
   sp_sc_flow_if number cvar ~gametime >= cvar ~timelimit
