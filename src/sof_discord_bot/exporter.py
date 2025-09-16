@@ -23,7 +23,7 @@ def load_server_data(filepath: str) -> Dict[str, Any]:
                 key, value = match.groups()
                 if key == "ctf_loops":
                     server_data[key] = int(value)
-                elif key == "capping_slot":
+                elif key == "~capping_slot":
                     server_data[key] = int(value)
                 elif key.startswith("~discord_"):
                     clean_key = key.replace("~discord_", "")
@@ -117,10 +117,10 @@ def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dic
     loaded_players = load_player_data_from_files(player_data_path)
     data = {"server": server_data, "players": loaded_players}
 
-    if data.get("end_reason") == "flaglimit":
+    if data.get("~end_reason") == "flaglimit":
         # Correct data.players[i].flags_captured for the winning team
-        winner = server_data.get("winner")
-        capping_slot = server_data.get("capping_slot")
+        winner = server_data.get("~winner")
+        capping_slot = server_data.get("~capping_slot")
         
         for player in data["players"]:
             team = player.get("team")
@@ -133,5 +133,5 @@ def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dic
         elif winner == "red":
             data["server"]["num_flags_red"] = data["server"].get("num_flags_red", 0) + 1
     
-    logger.info("Read data successfully for port %s, the match ended with %s", port, data.get("end_reason"))
+    logger.info("Read data successfully for port %s, the match ended with %s", port, data.get("~end_reason"))
     return data
