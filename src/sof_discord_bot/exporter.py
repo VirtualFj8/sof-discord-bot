@@ -135,7 +135,7 @@ def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dic
                     continue
                 team = player.get("team")
                 # Map team number to color: 0 -> "blue", 1 -> "red"
-                team_color = "blue" if team == 0 else "red" if team == 1 else None
+                team_color = "blue" if team == 1 else "red" if team == 2 else None
                 if team_color == winner and idx == capping_slot:
                     player["flags_captured"] = player.get("flags_captured", 0) + 1
             if winner == "blue":
