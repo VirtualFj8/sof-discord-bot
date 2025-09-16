@@ -8,6 +8,8 @@ function info_client_init( )
 
   sp_sc_func_exec spf_sc_list_add_func _sp_sv_on_map_begin "info_client_map_begin"
   sp_sc_func_exec spf_sc_list_add_func _sp_sv_on_map_end "upload_match_on_map_end"
+
+  sp_sc_on_change paused info_client_paused_changed
   
   sp_sc_func_exec info_client_map_begin
 }
@@ -16,10 +18,40 @@ function info_client_map_begin()
 {
   set _spf_upload_pending 0
   set _spf_upload_slot -1
-  // clear intermission flag at map begin
-  set _spf_in_intermission 0
 
-  
+  set _spf_in_intermission 0
+  set _spf_is_paused 0
+  set _spf_paused_time 0
+  set _spf_paused_time_start 0
+  set _spf_gametime_start 0
+
+  sp_sc_info_time
+  sp_sc_cvar_copy _spf_gametime_start _sp_sc_info_time_sec 
+
+}
+
+function info_client_paused_changed(~name)
+{
+  sp_sc_flow_if number cvar paused != val 0
+  {
+    //paused applied - record timestamp
+    set _spf_is_paused 1
+    sp_sc_info_time
+    sp_sc_cvar_copy _spf_paused_time_start _sp_sc_info_time_sec
+  }
+  else
+  {
+    sp_sc_flow_if number cvar _spf_is_paused == val 1
+    {
+      //calc time spent paused, subtract from gametime.
+      set _spf_is_paused 0
+      sp_sc_info_time
+      sp_sc_cvar_math_sub _sp_sc_info_time_sec #_spf_paused_time_start
+
+      sp_sc_cvar_math_add _spf_paused_time #_sp_sc_info_time_sec
+      
+    }
+  }
 }
 
 function info_client( )
@@ -49,31 +81,113 @@ function info_client( )
   }
 }
 
-function info_server(~discord_mode, ~discord_slot, ~discord_msg)
+function info_server(~discord_mode, ~discord_slot, ~discord_msg, ~end_reason, ~winner, ~capping_slot)
 {
-  sp_sc_cvar_save info_server/server.cfg hostname _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot ~discord_msg
+  sp_sc_cvar_save info_server/server.cfg hostname ctf_loops _sp_sv_info_map_current _sp_sv_info_flag_* _sp_sv_info_num_* ~discord_mode ~discord_slot ~discord_msg ~end_reason ~winner ~capping_slot
 }
 
 
 
 function upload_match_on_map_end()
 {
-  // 1 and a half server ticks to ensure we have all flag caps/points.
-  sset ~cmd sp_sc_func_exec upload_match_delayed #_spf_upload_slot
+   //Figure out how the match ended (fraglimit/timelimit/flaglimit)
+  
+  set ~i 0
+  set ~max_time 0
+  set ~max_frags 0
+  sp_sc_flow_while number cvar ~i < val 32
+  {
+    sp_sv_info_client #~i
+    sp_sc_flow_if number cvar _sp_sv_info_client_frames_total > cvar ~max_time
+    {
+      sp_sc_cvar_copy ~max_time _sp_sv_info_client_frames_total
+      
+    }
+    sp_sc_flow_if number cvar _sp_sv_info_client_frags > cvar ~max_frags
+    {
+      sp_sc_cvar_copy ~max_frags _sp_sv_info_client_frags
+    }
+
+    add ~i 1
+  }
+
+  sp_sc_flow_if cvar _sp_sv_timelimit_mod = val 0
+  {
+    //counting starts from player that has been in the server the longest
+
+    
+    sp_sc_cvar_copy ~gametime ~max_time
+    sp_sc_cvar_math_div ~gametime 10
+    
+  }
+  else
+  {
+    sp_sc_info_time
+    sp_sc_cvar_math_sub _sp_sc_info_time_sec #_spf_game_time_start
+    sp_sc_cvar_copy ~gametime _sp_sc_info_time_sec
+
+    sp_sc_flow_if cvar _sp_sv_timelimit_mod = val 2
+    {
+      //factor in paused deduction
+      sp_sc_cvar_math_sub ~gametime #_spf_paused_time
+    }
+  }
+  
+  sp_sc_cvar_copy ~timelimit timelimit 
+  sp_sc_cvar_math_mul ~timelimit 60
+
+  set ~end_reason "unknown"
+  sp_sc_flow_if number cvar ~gametime >= cvar timelimit
+  {
+    set ~end_reason "timelimit"
+  }
+  else
+  {
+    //fraglimit or flaglimit
+    sp_sc_flow_if cvar ~max_frags >= cvar fraglimit
+    {
+      set ~end_reason "fraglimit"
+    }
+    else
+    {
+      //share flaglimit to the discord script (hidden data)
+      set ~end_reason "flaglimit"
+      sp_sc_cvar_substr ~blue_flag_state _sp_sv_info_flag_blue 0 1
+      
+      sp_sc_flow_if text cvar ~blue_flag_state == val "r"
+      {
+        set ~winner "blue"
+        sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_blue 1 2
+      }
+      else
+      {
+        set ~winner "red"
+        sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_red 1 2
+      }
+      
+    }
+  }
+
+  //slight delay
+  sset ~cmd sp_sc_func_exec upload_match_delayed #_spf_upload_slot #~end_reason #~winner #~capping_slot
   sp_sc_timer 150 #~cmd
   
 }
 
-function upload_match_delayed(~slot)
+function upload_match_delayed(~slot, ~end_reason, ~winner, ~capping_slot)
 {
   // Mark that we're in intermission so commands can detect it
   set _spf_in_intermission 1
+
+ 
+
+
   // On map end perform upload if scheduled for the map
   sp_sc_flow_if number cvar _spf_upload_pending == val 1
   {
 
     sp_sc_func_exec info_client
-    sp_sc_func_exec info_server ".upload_match" #_spf_upload_slot ""
+    sp_sc_func_exec info_server ".upload_match" #_spf_upload_slot "" #~end_reason #~winner #~capping_slot
 
     
     sset ~msg "%04Scoreboard uploaded to %1Fhistoric-public-matches %04SoF discord channel. Type %03.discord %04for discord link." 
@@ -109,7 +223,7 @@ function info_client_signal_discord(~signal, ~slot, ~extramsg)
 }
 
 
-
+//We can never get the accurate number of flags captured, _sp_sv_info_num_flag_blue doesnt register last cap
 function .upload_match(~slot, *)
 {
 
@@ -123,7 +237,6 @@ function .upload_match(~slot, *)
   else
   {
     // If we're already in intermission, apply the upload immediately instead of scheduling it.
-    // Use our own toggle `_spf_in_intermission` (0/1) rather than `_sp_sv_intermission_end`.
     sp_sc_flow_if number cvar _spf_in_intermission == val 1
     {
       // Gather client info and trigger the upload flow immediately

@@ -21,7 +21,11 @@ def load_server_data(filepath: str) -> Dict[str, Any]:
                 if not match:
                     continue
                 key, value = match.groups()
-                if key.startswith("~discord_"):
+                if key == "ctf_loops":
+                    server_data[key] = int(value)
+                elif key == "capping_slot":
+                    server_data[key] = int(value)
+                elif key.startswith("~discord_"):
                     clean_key = key.replace("~discord_", "")
                     if clean_key == "slot":
                         try:
@@ -112,5 +116,22 @@ def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dic
         return None
     loaded_players = load_player_data_from_files(player_data_path)
     data = {"server": server_data, "players": loaded_players}
-    logger.info("Read data successfully for port %s", port)
+
+    if data.get("end_reason") == "flaglimit":
+        # Correct data.players[i].flags_captured for the winning team
+        winner = server_data.get("winner")
+        capping_slot = server_data.get("capping_slot")
+        
+        for player in data["players"]:
+            team = player.get("team")
+            # Map team number to color: 0 -> "blue", 1 -> "red"
+            team_color = "blue" if team == 0 else "red" if team == 1 else None
+            if team_color == winner and player.get("slot") == capping_slot:
+                player["flags_captured"] = player.get("flags_captured", 0) + 1
+        if winner == "blue":
+            data["server"]["num_flags_blue"] = data["server"].get("num_flags_blue", 0) + 1
+        elif winner == "red":
+            data["server"]["num_flags_red"] = data["server"].get("num_flags_red", 0) + 1
+    
+    logger.info("Read data successfully for port %s, the match ended with %s", port, data.get("end_reason"))
     return data
