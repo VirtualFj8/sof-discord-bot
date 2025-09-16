@@ -154,9 +154,9 @@ function upload_match_on_map_end()
       set ~end_reason "timelimit"
     }
   }
-  else
+
+  sp_sc_flow_if text cvar ~end_reason == val "unknown"
   {
-    //fraglimit or flaglimit
     sp_sc_flow_if number cvar fraglimit > val 0
     {
       sp_sc_flow_if number cvar ~max_frags >= cvar fraglimit
@@ -164,12 +164,17 @@ function upload_match_on_map_end()
         set ~end_reason "fraglimit"
       }
     }
-    else
+  }
+  
+  sp_sc_flow_if text cvar ~end_reason == val "unknown"
+  {
+    echo Debug flaglimit pathway
+    sp_sc_flow_if number cvar deathmatch == val 4
     {
-      echo Debug flaglimit pathway
-      sp_sc_flow_if number cvar deathmatch == val 4
+      echo Debug flatlimit deathmatch 4 confirmed
+      sp_sc_flow_if number cvar ctf_loops > val 0
       {
-        echo Debug flatlimit deathmatch 4 confirmed
+        echo flaglimit > 0
         //share flaglimit to the discord script (hidden data)
         set ~end_reason "flaglimit"
         sp_sc_cvar_substr ~blue_flag_state _sp_sv_info_flag_blue 0 1
@@ -185,8 +190,9 @@ function upload_match_on_map_end()
           sp_sc_cvar_substr ~capping_slot _sp_sv_info_flag_red 1 2
         }
       }
-    }
+    }    
   }
+        
 
   //slight delay
   sset ~cmd sp_sc_func_exec !upload_match_delayed #_spf_upload_slot #~end_reason #~winner #~capping_slot
