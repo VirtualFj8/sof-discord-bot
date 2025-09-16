@@ -141,10 +141,6 @@ function upload_match_on_map_end()
   sp_sc_cvar_copy ~timelimit timelimit 
   sp_sc_cvar_math_mul ~timelimit 60
 
-  ~max_time
-  ~max_frags
-  ~gametime
-  ~timelimit
 
   set ~end_reason "unknown"
   sp_sc_flow_if number cvar timelimit > val 0
@@ -168,13 +164,13 @@ function upload_match_on_map_end()
 
   sp_sc_flow_if text cvar ~end_reason == val "unknown"
   {
-    echo Debug flaglimit pathway
+
     sp_sc_flow_if number cvar deathmatch == val 4
     {
-      echo Debug flatlimit deathmatch 4 confirmed
+
       sp_sc_flow_if number cvar ctf_loops > val 0
       {
-        echo flaglimit > 0
+
         //share flaglimit to the discord script (hidden data)
         set ~end_reason "flaglimit"
         sp_sc_cvar_substr ~blue_flag_state _sp_sv_info_flag_blue 0 1
@@ -193,7 +189,6 @@ function upload_match_on_map_end()
     }    
   }
         
-  echo EndReason = $~end_reason .. Winner = #~winner .. CappingSlot = #~capping_slot
   //slight delay
   sset ~cmd sp_sc_func_exec !upload_match_delayed #_spf_upload_slot #~end_reason #~winner #~capping_slot
   sp_sc_timer 150 #~cmd

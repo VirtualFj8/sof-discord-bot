@@ -128,7 +128,7 @@ def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dic
         winner = server_data.get("~winner")
         capping_slot = server_data.get("~capping_slot","-1")
         
-        logger.info("Capping slot: %s", capping_slot)
+        # logger.info("Capping slot: %s", capping_slot)
         if isinstance(capping_slot, int) and 0 <= capping_slot < len(loaded_players):
             for idx, player in enumerate(loaded_players):
                 if player is None:
