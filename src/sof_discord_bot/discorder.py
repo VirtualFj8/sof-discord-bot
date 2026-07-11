@@ -12,6 +12,13 @@ from .logging_utils import get_logger
 
 logger = get_logger(__name__)
 
+_WEBHOOK_ENV_KEYS = ("DISCORD_WEBHOOK_URL", "DISCORD_WEBHOOK_URL_2")
+
+
+def _webhook_urls() -> list[tuple[str, str]]:
+    load_dotenv()
+    return [(key, url) for key in _WEBHOOK_ENV_KEYS if (url := os.getenv(key))]
+
 
 @dataclass
 class Player:
@@ -160,19 +167,24 @@ def generate_payload(
 
 
 def send_to_discord(payload: dict) -> None:
-    load_dotenv()
-    webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
-    if not webhook_url:
-        logger.error("DISCORD_WEBHOOK_URL is not set. Skipping Discord send.")
+    webhooks = _webhook_urls()
+    if not webhooks:
+        logger.error("No Discord webhook URLs configured. Skipping Discord send.")
         return
-    try:
-        response = requests.post(webhook_url, json=payload, timeout=8)
-        if response.status_code not in (200, 204):
-            logger.error("Error sending message to Discord: %s - %s", response.status_code, response.text)
-        else:
-            logger.info("Message sent to Discord.")
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Failed to send message to Discord: %s", exc)
+    for env_key, webhook_url in webhooks:
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=8)
+            if response.status_code not in (200, 204):
+                logger.error(
+                    "Error sending message to Discord (%s): %s - %s",
+                    env_key,
+                    response.status_code,
+                    response.text,
+                )
+            else:
+                logger.info("Message sent to Discord (%s).", env_key)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to send message to Discord (%s): %s", env_key, exc)
 
 
 def upload_image_to_discord(file_path: str, payload: Optional[dict] = None) -> Optional[dict]:
@@ -181,26 +193,45 @@ def upload_image_to_discord(file_path: str, payload: Optional[dict] = None) -> O
     Returns the response JSON (if any) or None on failure. Many webhooks return an empty
     body on success (204), so callers should not rely on a JSON body being present.
     """
-    load_dotenv()
-    webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
-    if not webhook_url:
-        logger.error("DISCORD_WEBHOOK_URL is not set. Skipping Discord upload.")
+    webhooks = _webhook_urls()
+    if not webhooks:
+        logger.error("No Discord webhook URLs configured. Skipping Discord upload.")
         return None
+    data = payload or {}
+    basename = os.path.basename(file_path)
+    result: Optional[dict] = None
     try:
-        data = payload or {}
         with open(file_path, "rb") as fp:
-            files = {"file": (os.path.basename(file_path), fp, "image/png")}
-            response = requests.post(webhook_url, data={"payload_json": json_dumps(data)}, files=files, timeout=20)
-        if response.status_code not in (200, 204):
-            logger.error("Error uploading image to Discord: %s - %s", response.status_code, response.text)
-            return None
-        try:
-            return response.json()
-        except Exception:
-            return None
+            file_bytes = fp.read()
     except Exception as exc:  # noqa: BLE001
-        logger.exception("Failed to upload image to Discord: %s", exc)
+        logger.exception("Failed to read image for Discord upload: %s", exc)
         return None
+    for env_key, webhook_url in webhooks:
+        try:
+            files = {"file": (basename, file_bytes, "image/png")}
+            response = requests.post(
+                webhook_url,
+                data={"payload_json": json_dumps(data)},
+                files=files,
+                timeout=20,
+            )
+            if response.status_code not in (200, 204):
+                logger.error(
+                    "Error uploading image to Discord (%s): %s - %s",
+                    env_key,
+                    response.status_code,
+                    response.text,
+                )
+                continue
+            logger.info("Image uploaded to Discord (%s).", env_key)
+            if result is None:
+                try:
+                    result = response.json()
+                except Exception:
+                    result = None
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to upload image to Discord (%s): %s", env_key, exc)
+    return result
 
 
 def json_dumps(obj: dict) -> str:
