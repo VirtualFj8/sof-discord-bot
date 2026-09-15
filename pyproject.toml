@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sof-discord-bot"
-version = "0.1.0"
+version = "0.2.0"
 description = "Discord webhook scoreboard bot for Soldier of Fortune (SoF1) servers"
 readme = "README.md"
 authors = [{name = "SoF Community", email = "noreply@example.com"}]
@@ -12,7 +12,6 @@ requires-python = ">=3.9"
 dependencies = [
   "Pillow>=10.0.0",
   "requests>=2.31.0",
-  "watchdog>=4.0.0",
   "python-dotenv>=1.0.1"
 ]
 classifiers = [

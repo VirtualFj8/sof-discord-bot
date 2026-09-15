@@ -1,0 +1,35 @@
+# Template systemd unit for the sof-export-fire trigger bus, which
+# sof-discord-bot subscribes to. Copy to
+# /etc/systemd/system/sof-export-fire.service and edit paths/user.
+# The bot reconnects on its own, so it survives restarts of this service,
+# but starting the bus first avoids a reconnect wait at boot.
+[Unit]
+Description=SoF export-fire trigger bus (ext_trigger watcher and socket server)
+After=network-online.target
+Wants=network-online.target
+Before=sof-discord-bot.service
+
+[Service]
+Type=simple
+# Run as a dedicated unprivileged user/group
+User=sofbot
+Group=sofbot
+
+# Directory where the sof-export-fire checkout lives (adjust).
+# Needs its own venv with watchdog: python3 -m venv venv && venv/bin/pip install -r requirements.txt
+WorkingDirectory=/opt/sof-export-fire
+
+# SoF root containing user-<port>/ dirs, and the bus bind address (adjust).
+# The bot defaults to 127.0.0.1:8765 (SOF_EXPORT_FIRE_HOST/PORT); keep them in sync.
+ExecStart=/opt/sof-export-fire/venv/bin/python sof_export_fire.py --root /opt/sof --serve 127.0.0.1:8765
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+
+# Journald logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

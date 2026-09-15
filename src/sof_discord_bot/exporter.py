@@ -56,6 +56,47 @@ def load_server_data(filepath: str) -> Dict[str, Any]:
     return server_data
 
 
+def load_trigger_data(filepath: str) -> Dict[str, Any]:
+    """Parse an ext_trigger wakeup file (e.g. ``ext_trigger/discord.cfg``).
+
+    Written by ``ext_trigger_fire`` (see ``ext_trigger.func``, canonical
+    source in sof-profiles): ``~name`` -> ``name``, ``~slot`` -> ``slot``,
+    ``~arg1`` -> ``mode``, ``~arg2`` -> ``msg``, plus the monotonic ``seq``.
+    Returns an empty dict when the file is absent (servers still running the
+    pre-migration .func that only writes ``info_server/server.cfg``).
+    """
+    trigger_data: Dict[str, Any] = {}
+    if not os.path.isfile(filepath):
+        return trigger_data
+    cvar_pattern = re.compile(r'set "([^"]+)" "([^"]*)"')
+    try:
+        with open(filepath, "r", encoding="latin-1") as file_obj:
+            for line in file_obj:
+                match = cvar_pattern.match(line)
+                if not match:
+                    continue
+                key, value = match.groups()
+                if key == "_ext_trigger_name":
+                    trigger_data["name"] = value
+                elif key == "_ext_trigger_seq":
+                    try:
+                        trigger_data["seq"] = int(value)
+                    except ValueError:
+                        trigger_data["seq"] = value
+                elif key == "_ext_trigger_slot":
+                    try:
+                        trigger_data["slot"] = int(value)
+                    except ValueError:
+                        trigger_data["slot"] = value
+                elif key == "_ext_trigger_arg1":
+                    trigger_data["mode"] = value
+                elif key == "_ext_trigger_arg2":
+                    trigger_data["msg"] = value
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Error processing trigger file %s: %s", filepath, exc)
+    return trigger_data
+
+
 def load_player_data_from_files(directory_path: str) -> List[Optional[dict]]:
     players: List[Optional[dict]] = [None] * 16
     if not os.path.isdir(directory_path):
@@ -114,6 +155,7 @@ def load_player_data_from_files(directory_path: str) -> List[Optional[dict]]:
 
 def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dict]:
     server_cfg_path = os.path.join(sofplus_data_path, "info_server/server.cfg")
+    trigger_cfg_path = os.path.join(sofplus_data_path, "ext_trigger/discord.cfg")
     # Prefer a snapshot directory if present; fall back to live info_client
     snap_path = os.path.join(sofplus_data_path, "info_client_snap")
     if os.path.isdir(snap_path):
@@ -125,6 +167,23 @@ def read_data_from_sof_server(port: str, sofplus_data_path: str) -> Optional[dic
     if not server_data:
         logger.error("Could not load server data for port %s. Aborting.", port)
         return None
+    # Event metadata: prefer the ext_trigger wakeup file, which info_client
+    # fires *after* the snapshot above was written. Fall back to the legacy
+    # ~discord_* keys in server.cfg for pre-migration servers.
+    trigger_data = load_trigger_data(trigger_cfg_path)
+    if trigger_data.get("name"):
+        if "mode" in trigger_data:
+            server_data["mode"] = trigger_data["mode"]
+        if "slot" in trigger_data:
+            server_data["slot"] = trigger_data["slot"]
+        if "msg" in trigger_data:
+            server_data["msg"] = trigger_data["msg"]
+        server_data["trigger_seq"] = trigger_data.get("seq")
+        server_data["trigger_name"] = trigger_data.get("name")
+        logger.info(
+            "Using ext_trigger event %s seq=%s for port %s",
+            trigger_data.get("name"), trigger_data.get("seq"), port,
+        )
     loaded_players = load_player_data_from_files(player_data_path)
     data = {"server": server_data, "players": loaded_players}
 
