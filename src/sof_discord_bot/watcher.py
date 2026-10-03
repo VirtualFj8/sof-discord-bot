@@ -18,12 +18,35 @@ class DiscordTriggerHandler:
     domain logic per event dict.
     """
 
+    def __init__(self) -> None:
+        # Last seq seen per port, to spot restarts/replays/out-of-order delivery
+        # in the logs (e.g. seq=1 arriving after seq=2 means the game server
+        # restarted and its monotonic counter reset).
+        self._last_seq: dict[str, int] = {}
+
     def handle_trigger(self, event: dict) -> None:
         port = event.get("port", "?")
+        port_key = str(port)
+        name = event.get("name")
+        seq = event.get("seq")
         logger.info(
             "Received trigger %s seq=%s for port %s",
-            event.get("name"), event.get("seq"), port,
+            name, seq, port,
         )
+        # Warn on duplicate / out-of-order / reset seq so logs explain gaps.
+        try:
+            seq_int = int(seq) if seq is not None else None
+        except (TypeError, ValueError):
+            seq_int = None
+        if seq_int is not None:
+            last = self._last_seq.get(port_key)
+            if last is not None and seq_int <= last:
+                logger.warning(
+                    "Non-monotonic seq for port %s: got seq=%s after last seq=%s "
+                    "(server restart? replayed/coalesced event? possible duplicate upload)",
+                    port, seq_int, last,
+                )
+            self._last_seq[port_key] = seq_int
         sofplus_data_path = event.get("data_dir") or ("../user-%s/sofplus/data" % port)
         if not os.path.exists(sofplus_data_path):
             logger.error("Directory does not exist: %s", sofplus_data_path)
@@ -99,19 +122,70 @@ class DiscordTriggerHandler:
                 needed_players = 2
 
             # Default description if not provided via custom_text
+            custom_msg = custom_text
             if mode in {".wantmatch", ".match1", ".match2", ".want1", ".want2", ".wantplay"}:
                 custom_msg = custom_text or "Players on the server want a match. Who's in?"
 
-                
+
             mode = server.get("mode") or ""
             if mode == ".upload_match":
                 image_path = generate_screenshot_for_port(port, sofplus_data_path, exported_data)
-                if image_path:
+                if not image_path:
+                    logger.error(
+                        "port=%s seq=%s screenshot generation FAILED; Discord upload skipped",
+                        port, seq,
+                    )
+                else:
                     # Post-process image per upload-match rules (overlay + crop)
                     processed_path = postprocess_upload_match_image(image_path, exported_data)
+                    if processed_path:
+                        logger.info(
+                            "port=%s seq=%s postprocess OK: %s -> %s",
+                            port, seq, image_path, processed_path,
+                        )
+                    else:
+                        logger.warning(
+                            "port=%s seq=%s postprocess FAILED, falling back to raw %s",
+                            port, seq, image_path,
+                        )
                     final_path = processed_path or image_path
-                    # Upload as file to webhook so it lives in Discord
-                    upload_image_to_discord(final_path, {})
+                    try:
+                        fsize = os.path.getsize(final_path)
+                    except OSError as exc:
+                        logger.error(
+                            "port=%s seq=%s upload SKIPPED: cannot stat %s: %s",
+                            port, seq, final_path, exc,
+                        )
+                        return
+                    # Upload as file to webhook so it lives in Discord.
+                    # upload_image_to_discord now uses ?wait=true and returns
+                    # per-webhook {ok, status, message_id, ...}; only ok=True
+                    # (2xx + message id) counts as VERIFIED.
+                    results = upload_image_to_discord(final_path, {})
+                    total = len(results)
+                    ok_keys = [k for k, r in results.items() if r.get("ok")]
+                    ok = len(ok_keys)
+                    ids = {k: (r.get("message_id"), r.get("channel_id")) for k, r in results.items()}
+                    if total == 0:
+                        logger.error(
+                            "port=%s seq=%s upload SKIPPED: no webhooks configured (file=%s %db)",
+                            port, seq, final_path, fsize,
+                        )
+                    elif ok == total:
+                        logger.info(
+                            "port=%s seq=%s upload VERIFIED %d/%d (file=%s %db ids=%s)",
+                            port, seq, ok, total, final_path, fsize, ids,
+                        )
+                    elif ok == 0:
+                        logger.error(
+                            "port=%s seq=%s upload FAILED 0/%d (file=%s %db details=%s)",
+                            port, seq, total, final_path, fsize, results,
+                        )
+                    else:
+                        logger.warning(
+                            "port=%s seq=%s upload PARTIAL %d/%d (file=%s %db ids=%s details=%s)",
+                            port, seq, ok, total, final_path, fsize, ids, results,
+                        )
             else:
                 payload = generate_payload(
                     caller_name=caller_name,
@@ -125,7 +199,17 @@ class DiscordTriggerHandler:
                     map_name=server.get("map_current"),
                     hostname=server.get("hostname"),
                 )
-                send_to_discord(payload)
+                results = send_to_discord(payload)
+                total = len(results)
+                ok = sum(1 for r in results.values() if r.get("ok"))
+                if total == 0:
+                    logger.error("port=%s seq=%s send SKIPPED: no webhooks configured", port, seq)
+                elif ok == total:
+                    logger.info("port=%s seq=%s send VERIFIED %d/%d", port, seq, ok, total)
+                elif ok == 0:
+                    logger.error("port=%s seq=%s send FAILED 0/%d details=%s", port, seq, total, results)
+                else:
+                    logger.warning("port=%s seq=%s send PARTIAL %d/%d details=%s", port, seq, ok, total, results)
         except Exception:
             logger.exception("Failed to prepare or send Discord notification")
 

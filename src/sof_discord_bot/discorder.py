@@ -20,6 +20,51 @@ def _webhook_urls() -> list[tuple[str, str]]:
     return [(key, url) for key in _WEBHOOK_ENV_KEYS if (url := os.getenv(key))]
 
 
+def _mask_webhook(url: str) -> str:
+    """Return a log-safe webhook identifier (id + last 4 of token, never the secret)."""
+    try:
+        # https://discord.com/api/webhooks/<id>/<token>[?wait=true]
+        base = url.split("?", 1)[0].rstrip("/")
+        parts = base.split("/")
+        if len(parts) >= 2:
+            wid, token = parts[-2], parts[-1]
+            return f"id={wid} token=...{token[-4:]}" if len(token) >= 4 else f"id={wid} token=...?"
+        return "..." + base[-12:]
+    except Exception:
+        return "(unparseable)"
+
+
+def _with_wait(url: str) -> str:
+    """Append ?wait=true so Discord returns the created message JSON (verifiable id).
+
+    Without it Discord replies 204 with an empty body, which proves the POST was
+    accepted but gives no message/channel id to correlate in logs.
+    """
+    if "wait=" in url:
+        return url
+    return url + ("&wait=true" if "?" in url else "?wait=true")
+
+
+def _parse_message_response(response) -> tuple[str | None, str | None]:
+    """Extract (message_id, channel_id) from a Discord ?wait=true response, else (None, None)."""
+    try:
+        body = response.json()
+        if isinstance(body, dict):
+            mid = body.get("id")
+            cid = body.get("channel_id")
+            return (str(mid) if mid else None, str(cid) if cid else None)
+    except Exception:
+        pass
+    return None, None
+
+
+def _truncate(text: str | None, limit: int = 500) -> str:
+    if not text:
+        return ""
+    text = str(text)
+    return text if len(text) <= limit else text[:limit] + f"...[truncated {len(text)-limit} chars]"
+
+
 @dataclass
 class Player:
     name: str
@@ -166,72 +211,128 @@ def generate_payload(
 
 
 
-def send_to_discord(payload: dict) -> None:
-    webhooks = _webhook_urls()
-    if not webhooks:
-        logger.error("No Discord webhook URLs configured. Skipping Discord send.")
-        return
-    for env_key, webhook_url in webhooks:
-        try:
-            response = requests.post(webhook_url, json=payload, timeout=8)
-            if response.status_code not in (200, 204):
-                logger.error(
-                    "Error sending message to Discord (%s): %s - %s",
-                    env_key,
-                    response.status_code,
-                    response.text,
-                )
-            else:
-                logger.info("Message sent to Discord (%s).", env_key)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Failed to send message to Discord (%s): %s", env_key, exc)
+def send_to_discord(payload: dict) -> dict[str, dict]:
+    """POST a JSON payload to all configured webhooks with ?wait=true.
 
-
-def upload_image_to_discord(file_path: str, payload: Optional[dict] = None) -> Optional[dict]:
-    """Upload an image file to the Discord webhook as multipart form data.
-
-    Returns the response JSON (if any) or None on failure. Many webhooks return an empty
-    body on success (204), so callers should not rely on a JSON body being present.
+    Returns per-webhook results: {env_key: {"ok": bool, "status": int|None,
+    "message_id": str|None, "channel_id": str|None, "error": str|None}}.
+    Success is only logged when Discord returns 2xx AND (with wait=true) a
+    message id — otherwise it is an ERROR so journald no longer shows a false
+    'Message sent'.
     """
     webhooks = _webhook_urls()
+    results: dict[str, dict] = {}
+    if not webhooks:
+        logger.error("No Discord webhook URLs configured. Skipping Discord send.")
+        return results
+    for env_key, webhook_url in webhooks:
+        target = _with_wait(webhook_url)
+        who = f"{env_key}({_mask_webhook(webhook_url)})"
+        try:
+            response = requests.post(target, json=payload, timeout=8)
+            status = response.status_code
+            if status not in (200, 204):
+                err = _truncate(response.text)
+                # Surface rate-limit waits explicitly (Discord 429 {"retry_after": X}).
+                try:
+                    retry_after = response.json().get("retry_after") if status == 429 else None
+                except Exception:
+                    retry_after = None
+                extra = f" retry_after={retry_after}s" if retry_after is not None else ""
+                logger.error(
+                    "Discord send FAILED (%s): status=%s%s body=%s",
+                    who, status, extra, err,
+                )
+                results[env_key] = {"ok": False, "status": status, "message_id": None, "channel_id": None, "error": err}
+                continue
+            message_id, channel_id = _parse_message_response(response)
+            if status == 204 or message_id is None:
+                # Accepted but unverified (no ?wait support / empty body). Treat as
+                # suspicious, not success, so callers investigate instead of assuming.
+                logger.warning(
+                    "Discord send UNVERIFIED (%s): status=%s accepted but no message id returned (no ?wait JSON).",
+                    who, status,
+                )
+                results[env_key] = {"ok": False, "status": status, "message_id": None, "channel_id": channel_id, "error": "no-message-id"}
+            else:
+                logger.info(
+                    "Discord send VERIFIED (%s): status=%s message_id=%s channel_id=%s",
+                    who, status, message_id, channel_id,
+                )
+                results[env_key] = {"ok": True, "status": status, "message_id": message_id, "channel_id": channel_id, "error": None}
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Discord send EXCEPTION (%s): %s", who, exc)
+            results[env_key] = {"ok": False, "status": None, "message_id": None, "channel_id": None, "error": str(exc)}
+    return results
+
+
+def upload_image_to_discord(file_path: str, payload: Optional[dict] = None) -> dict[str, dict]:
+    """Upload an image file to all Discord webhooks as multipart form data.
+
+    Uses ?wait=true so success returns a message JSON with id/channel_id.
+    Returns per-webhook results: {env_key: {"ok": bool, "status": int|None,
+    "message_id": str|None, "channel_id": str|None, "bytes": int, "error": str|None}}.
+    Only 2xx WITH a message id counts as ok=True; 204/empty body is UNVERIFIED
+    (ok=False) so the watcher logs FAILED/PARTIAL instead of a false 'uploaded'.
+    """
+    webhooks = _webhook_urls()
+    results: dict[str, dict] = {}
     if not webhooks:
         logger.error("No Discord webhook URLs configured. Skipping Discord upload.")
-        return None
+        return results
     data = payload or {}
     basename = os.path.basename(file_path)
-    result: Optional[dict] = None
     try:
         with open(file_path, "rb") as fp:
             file_bytes = fp.read()
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to read image for Discord upload: %s", exc)
-        return None
+        for env_key, _ in webhooks:
+            results[env_key] = {"ok": False, "status": None, "message_id": None, "channel_id": None, "bytes": 0, "error": f"read-failed: {exc}"}
+        return results
+    nbytes = len(file_bytes)
     for env_key, webhook_url in webhooks:
+        target = _with_wait(webhook_url)
+        who = f"{env_key}({_mask_webhook(webhook_url)})"
         try:
             files = {"file": (basename, file_bytes, "image/png")}
             response = requests.post(
-                webhook_url,
+                target,
                 data={"payload_json": json_dumps(data)},
                 files=files,
                 timeout=20,
             )
-            if response.status_code not in (200, 204):
-                logger.error(
-                    "Error uploading image to Discord (%s): %s - %s",
-                    env_key,
-                    response.status_code,
-                    response.text,
-                )
-                continue
-            logger.info("Image uploaded to Discord (%s).", env_key)
-            if result is None:
+            status = response.status_code
+            if status not in (200, 204):
+                err = _truncate(response.text)
                 try:
-                    result = response.json()
+                    retry_after = response.json().get("retry_after") if status == 429 else None
                 except Exception:
-                    result = None
+                    retry_after = None
+                extra = f" retry_after={retry_after}s" if retry_after is not None else ""
+                logger.error(
+                    "Discord upload FAILED (%s): status=%s%s bytes=%d file=%s body=%s",
+                    who, status, extra, nbytes, basename, err,
+                )
+                results[env_key] = {"ok": False, "status": status, "message_id": None, "channel_id": None, "bytes": nbytes, "error": err}
+                continue
+            message_id, channel_id = _parse_message_response(response)
+            if status == 204 or message_id is None:
+                logger.warning(
+                    "Discord upload UNVERIFIED (%s): status=%s accepted but no message id returned bytes=%d file=%s.",
+                    who, status, nbytes, basename,
+                )
+                results[env_key] = {"ok": False, "status": status, "message_id": None, "channel_id": channel_id, "bytes": nbytes, "error": "no-message-id"}
+            else:
+                logger.info(
+                    "Discord upload VERIFIED (%s): status=%s bytes=%d file=%s message_id=%s channel_id=%s",
+                    who, status, nbytes, basename, message_id, channel_id,
+                )
+                results[env_key] = {"ok": True, "status": status, "message_id": message_id, "channel_id": channel_id, "bytes": nbytes, "error": None}
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Failed to upload image to Discord (%s): %s", env_key, exc)
-    return result
+            logger.exception("Discord upload EXCEPTION (%s): bytes=%d file=%s: %s", who, nbytes, basename, exc)
+            results[env_key] = {"ok": False, "status": None, "message_id": None, "channel_id": None, "bytes": nbytes, "error": str(exc)}
+    return results
 
 
 def json_dumps(obj: dict) -> str:
