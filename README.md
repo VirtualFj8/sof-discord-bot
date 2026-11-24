@@ -232,3 +232,5 @@ Rollback is asymmetric, so follow it exactly:
 
 ## License
 MIT for this repository. Game assets remain the property of their respective owners.
+
+Prefer pictures? Start with **[HUMANS.md](HUMANS.md)**.

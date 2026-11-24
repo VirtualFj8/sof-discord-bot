@@ -1,0 +1,80 @@
+# sof-discord-bot — system overview
+# A trigger subscriber: the game fires an event, the bot reads the snapshot
+# the game wrote, draws a scoreboard, posts it to a Discord webhook.
+# Zones run left to right: entry points -> core -> state -> external.
+# Style classes set strokes only, so light and dark stay readable.
+
+title: |md
+  # sof-discord-bot
+  A Discord webhook bot for Soldier of Fortune 1 servers: it subscribes to `sof-export-fire` events, reads the info snapshot the game just wrote, renders a scoreboard image, and posts it.
+| {near: top-center}
+
+direction: right
+grid-columns: 2
+grid-rows: 2
+horizontal-gap: 140
+vertical-gap: 140
+
+entry: Entry points {
+  direction: down
+
+  cli: `sof-discord-bot` · console script → `cli.main` → `run_watcher`, one blocking loop
+  addon: `sofplus/addons/info_client.func` · snapshots server and players into cvars, then fires `discord`
+  trig: `sofplus/addons/ext_trigger.func` · vendored trigger helper: one file write per event
+  timer: `sofplus/addons/sp_sc_timer_2.func` · vendored timer helper the snapshots run on
+  svc: `systemd/` · bot unit plus the export-fire unit it depends on
+}
+
+core: Core {
+  direction: down
+
+  sub: `trigger_client.subscribe_forever` · JSON lines: hello, subscribe, ping· reconnect with backoff
+  handler: `DiscordTriggerHandler.handle_trigger` · per-event domain logic · skip when no active players
+  reader: `exporter.read_data_from_sof_server` · server.cfg + player files + the trigger file
+  parse: `set "k" "v"` regex · strips `_sp_sv_info_` and `~discord_` prefixes, coerce ints
+  board: `scoreboard.generate_screenshot_for_port` · PIL composite: map, portraits, text, flags
+  post: `discorder.generate_payload` / `send_to_discord` · embed plus PNG, `?wait=true`, URL masked in logs
+  log: `logging_utils` · one format, level from `SOF_BOT_LOG`
+  fake: `fakedata.py` · sample players for developers, imported by nothing
+
+  sub -> handler: one dict per event
+  handler -> reader: what port, which data dir
+  reader -> parse: raw cfg files in
+  handler -> board: players in, PNG out
+  board -> post: image plus embed
+}
+
+state: State {
+  direction: down
+
+  env: `.env` / systemd `EnvironmentFile` · webhooks, host, port, log level {shape: cylinder}
+  data: `user-<port>/sofplus/data/` · `info_server`, `info_client(_snap)`, `ext_trigger` {shape: cylinder}
+  assets: `src/.../assets/` · conchars, flags, optional map screenshots {shape: cylinder}
+  paks: `base/pak0.pak`, `pak2.pak` · portraits and conchars, cached per process {shape: cylinder}
+  seq: `_last_seq` per port · in memory only, used to warn on restarts {shape: cylinder}
+}
+
+ext: External {
+  direction: down
+
+  fire: `sof-export-fire` on 127.0.0.1:8765 · separate install, owns watching and dedupe
+  discord: Discord webhook API · embed JSON, then multipart PNG
+  sof: SoF server plus SoFplus · writes every file this bot reads
+  paklib: vendored `pak.py`, `m32lib.py` · PAK index and M32 mip decoding
+}
+
+entry -> core: the game fires, the bot wakes
+core -> state
+core -> ext: subscribe in, webhook out
+
+classes: {
+  entry: {style: {stroke: "#2f6fbf"}}
+  core: {style: {stroke: "#2f8f5f"}}
+  state: {style: {stroke: "#a86a12"; stroke-dash: 3}}
+  ext: {style: {stroke: "#8a4fbf"; stroke-dash: 5}}
+}
+
+entry.class: entry
+core.class: core
+state.class: state
+ext.class: ext
